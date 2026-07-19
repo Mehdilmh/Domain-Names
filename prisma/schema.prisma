@@ -17,6 +17,7 @@ model User {
   image         String?
   credits       Int       @default(25)
   tier          String    @default("free")
+  role          String    @default("user") // "user" | "admin" (admins have unlimited credits)
 
   accounts       Account[]
   sessions       Session[]

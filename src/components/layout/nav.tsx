@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { APP_NAME } from "@/config/app";
 import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/db";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 const links = [
   { href: "/appraise", label: "Appraise" },
@@ -15,6 +17,11 @@ const links = [
 export async function Nav() {
   const session = await auth();
   const user = session?.user;
+  const userId = (user as { id?: string } | undefined)?.id;
+  const dbUser = userId
+    ? await prisma.user.findUnique({ where: { id: userId }, select: { credits: true, role: true } })
+    : null;
+  const isAdmin = dbUser?.role === "admin";
 
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur">
@@ -38,11 +45,16 @@ export async function Nav() {
 
         <div className="flex items-center gap-2">
           {user ? (
-            <Link href="/portfolio">
-              <Button variant="ghost" size="sm">
-                {user.name ?? user.email}
-              </Button>
-            </Link>
+            <>
+              <Badge variant={isAdmin ? "secondary" : "muted"} className="mono-num hidden sm:inline-flex">
+                {isAdmin ? "∞ admin" : `${dbUser?.credits ?? 0} credits`}
+              </Badge>
+              <Link href="/portfolio">
+                <Button variant="ghost" size="sm">
+                  {user.name ?? user.email}
+                </Button>
+              </Link>
+            </>
           ) : (
             <Link href="/login">
               <Button size="sm">Sign in</Button>

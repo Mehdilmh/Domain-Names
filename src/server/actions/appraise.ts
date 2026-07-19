@@ -3,14 +3,14 @@
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { appraise } from "@/lib/valuation";
-import { spendCredits, InsufficientCreditsError } from "@/lib/credits";
+import { spendCredits, InsufficientCreditsError, userIsAdmin } from "@/lib/credits";
 import { CREDIT_COST } from "@/config/app";
 import { appraiseInputSchema } from "@/schemas/appraise";
 import { prisma } from "@/lib/db";
 import type { AppraisalResult } from "@/lib/valuation/types";
 
 export type AppraiseActionResult =
-  | { ok: true; result: AppraisalResult; creditsLeft: number | null }
+  | { ok: true; result: AppraisalResult; creditsLeft: number | null; unlimited: boolean }
   | { ok: false; error: string; code?: "auth" | "credits" | "validation" };
 
 /**
@@ -66,6 +66,7 @@ export async function appraiseAction(input: unknown): Promise<AppraiseActionResu
     creditsLeft = user?.credits ?? null;
   }
 
+  const unlimited = await userIsAdmin(userId);
   revalidatePath("/appraise");
-  return { ok: true, result, creditsLeft };
+  return { ok: true, result, creditsLeft, unlimited };
 }

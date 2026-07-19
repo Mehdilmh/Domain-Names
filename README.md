@@ -24,6 +24,20 @@ npm run dev                   # http://localhost:3000
 That's it. Sign in from `/login` using the **dev sign-in** (any email, no password, only
 enabled outside production) and you'll get 25 free credits.
 
+### Admin login (unlimited credits)
+
+Accounts whose email is in `ADMIN_EMAILS` are auto-promoted to the **admin** role and have
+**unlimited credits** — appraisals, bulk jobs, and API calls are never charged.
+
+- The seed creates a ready-to-use admin: **`admin@domainpulse.test`**. Sign in at `/login` with
+  that email (dev sign-in) to get an unlimited account immediately.
+- To make your own account admin, add your email:
+  `ADMIN_EMAILS="admin@domainpulse.test,you@example.com"` in `.env`, then sign in with it (works
+  with Google/email providers too — promotion happens on sign-in). Existing accounts are promoted
+  automatically the next time they sign in.
+
+The nav shows `∞ admin` for admin accounts and the live credit balance for everyone else.
+
 ### Requirements
 
 - Node 20+

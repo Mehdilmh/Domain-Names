@@ -60,10 +60,14 @@ export function SearchHero({ compact = false }: { compact?: boolean }) {
 
       {result && result.ok && (
         <div className={compact ? "mt-6" : "mx-auto mt-8 max-w-3xl"}>
-          {result.creditsLeft !== null && (
+          {(result.unlimited || result.creditsLeft !== null) && (
             <p className="mb-3 text-center text-xs text-muted-foreground">
               {result.result.cached ? "Served from cache (no credit used) · " : ""}
-              {result.creditsLeft} credits remaining
+              {result.unlimited ? (
+                <span className="text-primary">Unlimited credits (admin)</span>
+              ) : (
+                <>{result.creditsLeft} credits remaining</>
+              )}
             </p>
           )}
           <AppraisalReport result={result.result} />

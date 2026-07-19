@@ -82,3 +82,17 @@ export const API_RATE_LIMIT = {
 
 /** Renewal alert threshold. */
 export const RENEWAL_ALERT_DAYS = 30;
+
+/**
+ * Admin allowlist. Any account whose email is listed here is auto-promoted to
+ * the "admin" role on sign-in and has UNLIMITED credits (spends are never
+ * charged). Configure via the ADMIN_EMAILS env var (comma-separated).
+ */
+export const ADMIN_EMAILS = (process.env.ADMIN_EMAILS ?? "admin@domainpulse.test")
+  .split(",")
+  .map((e) => e.trim().toLowerCase())
+  .filter(Boolean);
+
+export function isAdminEmail(email?: string | null): boolean {
+  return Boolean(email && ADMIN_EMAILS.includes(email.toLowerCase()));
+}

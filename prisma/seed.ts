@@ -1,6 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import { extractFeatures, toVector } from "../src/lib/valuation/features";
 import { predict } from "../src/lib/valuation/model";
+import { ADMIN_EMAILS } from "../src/config/app";
 
 const prisma = new PrismaClient();
 
@@ -145,6 +146,16 @@ async function main() {
   for (let i = 0; i < rows.length; i += BATCH) {
     await prisma.sale.createMany({ data: rows.slice(i, i + BATCH) });
     console.log(`  inserted ${Math.min(i + BATCH, rows.length)}/${rows.length}`);
+  }
+
+  // Ensure a ready-to-use admin account (unlimited credits) for each allowlisted email.
+  for (const email of ADMIN_EMAILS) {
+    await prisma.user.upsert({
+      where: { email },
+      create: { email, name: "Admin", role: "admin", credits: 1_000_000, tier: "agency" },
+      update: { role: "admin", credits: 1_000_000, tier: "agency" },
+    });
+    console.log(`👑 Admin account ready: ${email}`);
   }
 
   const prices = rows.map((r) => r.price).sort((a, b) => a - b);

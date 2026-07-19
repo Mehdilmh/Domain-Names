@@ -23,9 +23,11 @@ export async function spendCredits(
   return prisma.$transaction(async (tx) => {
     const user = await tx.user.findUnique({
       where: { id: userId },
-      select: { credits: true },
+      select: { credits: true, role: true },
     });
     if (!user) throw new Error("user not found");
+    // Admins have unlimited credits: never decrement, never write a ledger row.
+    if (user.role === "admin") return user.credits;
     if (user.credits < amount) {
       throw new InsufficientCreditsError(amount, user.credits);
     }
@@ -42,6 +44,12 @@ export async function spendCredits(
 
     return updated.credits;
   });
+}
+
+/** Whether a user has the admin role (unlimited credits). */
+export async function userIsAdmin(userId: string): Promise<boolean> {
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
+  return user?.role === "admin";
 }
 
 /** Grant credits (purchase, monthly refill, admin) transactionally. */
