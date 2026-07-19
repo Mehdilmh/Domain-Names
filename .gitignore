@@ -11,3 +11,5 @@ coverage
 .turbo
 next-env.d.ts
 prisma/dev.db
+*.tsbuildinfo
+_*.ts
