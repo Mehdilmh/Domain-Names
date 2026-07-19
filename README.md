@@ -183,6 +183,58 @@ protected by `CRON_SECRET`:
 GET /api/cron/renewals?secret=$CRON_SECRET
 ```
 
+## Deploying to Vercel
+
+The repo is Vercel-ready: `prisma generate` runs on build, `vercel.json` registers the daily
+renewal cron, and Auth.js is configured with `trustHost`.
+
+**1. Provision a hosted Postgres.** Vercel Postgres, Neon, or Supabase all work. Copy its
+connection string.
+
+**2. Import the repo** at [vercel.com/new](https://vercel.com/new) (or `npm i -g vercel && vercel`).
+Framework preset: **Next.js** (auto-detected).
+
+**3. Set environment variables** in the Vercel project settings:
+
+| Variable        | Required | Notes                                                        |
+| --------------- | -------- | ------------------------------------------------------------ |
+| `DATABASE_URL`  | ✅       | Hosted Postgres connection string                            |
+| `AUTH_SECRET`   | ✅       | `openssl rand -base64 32`                                    |
+| `ADMIN_EMAILS`  | ✅       | Your email(s) for the unlimited-credit admin account        |
+| `CRON_SECRET`   | recommended | Vercel sends it as the cron bearer token automatically   |
+| `REDIS_URL`     | recommended | Upstash Redis — see caveats below                        |
+| `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` | optional | Google login (dev sign-in is disabled in prod) |
+| `EMAIL_SERVER` / `EMAIL_FROM` | optional | Magic-link login + renewal digests            |
+| `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` | optional | Real billing              |
+| `ANTHROPIC_API_KEY` | optional | Claude explanations (else deterministic fallback)         |
+
+`AUTH_URL` is auto-detected from the Vercel domain — no need to set it.
+
+**4. Migrate and seed the hosted database** (once, from your machine, pointing at the hosted DB):
+
+```bash
+DATABASE_URL="<hosted-connection-string>" npx prisma migrate deploy
+DATABASE_URL="<hosted-connection-string>" npm run seed
+```
+
+**5. Log in** at `https://<your-app>.vercel.app/login`. In production the dev sign-in is disabled,
+so use Google/email — sign in with an address in `ADMIN_EMAILS` for the unlimited admin account.
+
+### Serverless caveats (important)
+
+Vercel runs each request in an isolated, short-lived function. Two features rely on shared/durable
+state and need extra infra in production:
+
+- **Cache & rate limiting** fall back to *in-memory* per-function state, which isn't shared across
+  Vercel lambdas. Set `REDIS_URL` (Upstash) so both work correctly across instances.
+- **Bulk jobs** use an in-process fallback that won't survive a serverless function freezing after
+  it responds. For reliable bulk processing, set `REDIS_URL` **and** run the BullMQ worker
+  (`npm run worker`) on a always-on host (Railway, Render, Fly.io, a small VM). Single appraisals,
+  the API, portfolio, and cron all work on Vercel as-is.
+
+> I can't deploy this for you from here — this environment has no Vercel CLI or token and its network
+> policy blocks Vercel's API. The steps above are everything needed; it's a ~2-minute import.
+
 ## Stack
 
 Next.js 15 (App Router, server actions) · TypeScript · PostgreSQL + Prisma · Redis (optional) ·

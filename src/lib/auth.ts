@@ -64,6 +64,8 @@ if (process.env.NODE_ENV !== "production") {
 export const authConfig: NextAuthConfig = {
   adapter: PrismaAdapter(prisma),
   providers,
+  // Required when deployed behind a proxy / on Vercel custom domains.
+  trustHost: true,
   session: { strategy: "jwt" },
   pages: { signIn: "/login" },
   callbacks: {

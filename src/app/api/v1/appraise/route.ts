@@ -7,6 +7,7 @@ import { appraise } from "@/lib/valuation";
 import { CREDIT_COST } from "@/config/app";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 /**
  * POST /api/v1/appraise

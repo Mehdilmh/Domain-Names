@@ -9,8 +9,10 @@ export const metadata: Metadata = {
   description: "How our domain valuation model performs on a held-out backtest.",
 };
 
-// Recompute periodically; the seed data is static so this is cheap to cache.
-export const revalidate = 3600;
+// Rendered on demand so the backtest reflects live data once the DB is seeded
+// (avoids caching an empty state when built without a database, e.g. on Vercel).
+export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 export default async function AccuracyPage() {
   let backtest: Awaited<ReturnType<typeof runBacktest>> | null = null;
