@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { BookOpen, Boxes, ChevronsUpDown, FileStack, Gauge, LayoutDashboard, LayoutTemplate, ListChecks, LogOut, Moon, PlusCircle, Settings, Sun } from 'lucide-react';
+import { BookOpen, Boxes, Images, ChevronsUpDown, FileStack, Gauge, LayoutDashboard, LayoutTemplate, ListChecks, LogOut, Moon, PlusCircle, Settings, Sun } from 'lucide-react';
 import { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,7 @@ const NAV = [
   { to: '/batches', label: 'Batches', icon: Boxes },
   { to: '/jobs', label: 'Jobs', icon: ListChecks },
   { to: '/templates', label: 'Templates', icon: LayoutTemplate },
+  { to: '/models', label: 'Image models', icon: Images },
   { to: '/usage', label: 'AI usage & cost', icon: Gauge },
   { to: '/settings', label: 'Settings', icon: Settings },
 ];

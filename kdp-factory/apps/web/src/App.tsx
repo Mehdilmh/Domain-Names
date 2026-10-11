@@ -15,6 +15,7 @@ const BatchDetail = lazy(() => import('./pages/batch-detail'));
 const TemplatesPage = lazy(() => import('./pages/templates'));
 const UsagePage = lazy(() => import('./pages/usage'));
 const SettingsPage = lazy(() => import('./pages/settings'));
+const ModelsPage = lazy(() => import('./pages/models'));
 
 const Spinner = () => (
   <div className="flex h-64 items-center justify-center text-muted-foreground" role="status">
@@ -54,6 +55,7 @@ export function App() {
             <Route path="batches/:id" element={<BatchDetail />} />
             <Route path="templates" element={<TemplatesPage />} />
             <Route path="usage" element={<UsagePage />} />
+            <Route path="models" element={<ModelsPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="*" element={<p className="text-muted-foreground">Page not found.</p>} />
           </Route>

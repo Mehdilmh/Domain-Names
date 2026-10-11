@@ -11,6 +11,7 @@ import { api } from '@/lib/api';
 import { canEdit, useAuth } from '@/lib/auth';
 import type { CoverRow, ProjectDetail } from '@/lib/types';
 import { cn, titleCase } from '@/lib/utils';
+import { AiArtDialog } from './image-models';
 
 /* ---------------------------------- Undo/redo store ----------------------------------------- */
 
@@ -132,6 +133,20 @@ export default function CoverEditor({ project }: { project: ProjectDetail }) {
             {!cover.isActive && <Button size="sm" variant="outline" onClick={async () => { await api.post(`/projects/${project.id}/covers/${cover.id}/activate`); await qc.invalidateQueries({ queryKey: ['covers', project.id] }); toast.success('This design will be used for exports'); }}>Use for export</Button>}
             <OfficialTemplateDialog project={project} geometry={geom} />
             <NewCoverDialog project={project} themes={data.data!.themes} onCreated={(id) => setActiveId(id)} />
+            {geom.source !== 'UNRESOLVED' && design && (
+              <AiArtDialog
+                projectId={project.id}
+                onUse={(assetId, scope) => {
+                  // Same placement as the server's apply-art: art spans the area incl. bleed, below all text.
+                  const b = geom.bleedIn;
+                  const f = geom.panels.front;
+                  const layer = (scope === 'wrap'
+                    ? { id: 'cover-art', name: 'Cover art (AI)', type: 'image', anchor: 'canvas', x: 0, y: 0, w: geom.widthIn, h: geom.heightIn, assetId, fit: 'cover', rotation: 0, opacity: 1, locked: false, hidden: false }
+                    : { id: 'cover-art', name: 'Cover art (AI)', type: 'image', anchor: 'front', x: geom.direction === 'RTL' ? -b : 0, y: -b, w: f.w + b, h: f.h + 2 * b, assetId, fit: 'cover', rotation: 0, opacity: 1, locked: false, hidden: false }) as unknown as CoverLayer;
+                  useCover.getState().commit((d) => ({ ...d, layers: [layer, ...d.layers.filter((l) => l.id !== 'cover-art')] }));
+                }}
+              />
+            )}
           </>
         )}
         {dirty && <Badge tone="warning">Unsaved changes</Badge>}
