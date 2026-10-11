@@ -1,0 +1,516 @@
+// KDP Product Factory — normalized schema. Every tenant-owned row carries workspaceId (directly
+// or via its project) and every query is scoped to the caller's active workspace.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  OWNER
+  ADMIN
+  EDITOR
+  VIEWER
+}
+
+enum ProjectStatus {
+  DRAFT
+  RESEARCH
+  CONTENT
+  INTERIOR
+  COVER
+  VALIDATION
+  READY_FOR_REVIEW
+  EXPORTED
+}
+
+enum ContentClass {
+  LOW
+  MEDIUM
+  FULL
+}
+
+enum BookFormat {
+  PAPERBACK
+  HARDCOVER
+  EBOOK
+}
+
+enum JobStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+enum BatchStatus {
+  DRAFT
+  RUNNING
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
+enum BatchItemStatus {
+  PENDING
+  QUEUED
+  RUNNING
+  AWAITING_APPROVAL
+  APPROVED
+  REJECTED
+  FAILED
+  DUPLICATE
+}
+
+model User {
+  id           String       @id @default(cuid())
+  email        String       @unique
+  name         String
+  passwordHash String
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  memberships  Membership[]
+  sessions     Session[]
+}
+
+model Session {
+  id                String   @id @default(cuid())
+  tokenHash         String   @unique
+  userId            String
+  activeWorkspaceId String?
+  expiresAt         DateTime
+  createdAt         DateTime @default(now())
+  lastSeenAt        DateTime @default(now())
+  ip                String?
+  userAgent         String?
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Workspace {
+  id                  String               @id @default(cuid())
+  name                String
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  dailyCostLimitUsd   Decimal              @default(5) @db.Decimal(10, 4)
+  monthlyCostLimitUsd Decimal              @default(50) @db.Decimal(10, 4)
+  dailyJobLimit       Int                  @default(200)
+  aiDisclosureDefault Boolean              @default(false)
+  memberships         Membership[]
+  projects            Project[]
+  templates           PageTemplate[]
+  assets              Asset[]
+  jobs                GenerationJob[]
+  batches             BatchJob[]
+  providers           ProviderConfig[]
+  usage               UsageRecord[]
+  auditLogs           AuditLog[]
+  presets             Preset[]
+  validationRules     ValidationRule[]
+}
+
+model Membership {
+  id          String    @id @default(cuid())
+  userId      String
+  workspaceId String
+  role        Role      @default(EDITOR)
+  createdAt   DateTime  @default(now())
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, workspaceId])
+  @@index([workspaceId])
+}
+
+model Project {
+  id                    String             @id @default(cuid())
+  workspaceId           String
+  title                 String
+  category              String
+  contentClass          ContentClass
+  status                ProjectStatus      @default(DRAFT)
+  currentVersion        Int                @default(0)
+  aiTextGenerated       Boolean            @default(false)
+  aiImagesGenerated     Boolean            @default(false)
+  aiDisclosureAck       Boolean            @default(false)
+  similarity            Json?
+  fingerprint           Json?
+  createdById           String?
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+  archivedAt            DateTime?
+  workspace             Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  brief                 ProductBrief?
+  format                ProductFormat?
+  interior              InteriorDocument?
+  covers                CoverDesign[]
+  metadataDrafts        MetadataDraft[]
+  validationReports     ValidationReport[]
+  jobs                  GenerationJob[]
+  exports               ExportArtifact[]
+  versions              ProjectVersion[]
+  assets                Asset[]
+  batchItem             BatchItem?
+
+  @@index([workspaceId, status])
+  @@index([workspaceId, updatedAt])
+}
+
+model ProductBrief {
+  id                 String   @id @default(cuid())
+  projectId          String   @unique
+  workingTitle       String
+  targetReader       String
+  readerProblem      String
+  niche              String
+  differentiation    String
+  language           String   @default("English")
+  marketplace        String   @default("Amazon.com")
+  authorName         String
+  contentStyle       String   @default("")
+  designTheme        String   @default("midnight")
+  contentType        String
+  generationSettings Json
+  updatedAt          DateTime @updatedAt
+  project            Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model ProductFormat {
+  id               String     @id @default(cuid())
+  projectId        String     @unique
+  format           BookFormat
+  trimId           String
+  ink              String
+  paper            String
+  bleed            Boolean    @default(false)
+  coverFinish      String     @default("MATTE")
+  direction        String     @default("LTR")
+  targetPageCount  Int?
+  specVersion      String
+  officialCover    Json?
+  updatedAt        DateTime   @updatedAt
+  project          Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model InteriorDocument {
+  id         String         @id @default(cuid())
+  projectId  String         @unique
+  settings   Json
+  bodyKind   String         @default("pages")
+  chapters   Json?
+  revision   Int            @default(1)
+  updatedAt  DateTime       @updatedAt
+  project    Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  pages      PageInstance[]
+}
+
+model PageInstance {
+  id          String           @id @default(cuid())
+  /// Stable page id within the document (used by editors and templates).
+  key         String
+  documentId  String
+  section     String           @default("body")
+  position    Int
+  templateId  String?
+  fields      Json             @default("{}")
+  elements    Json?
+  locked      Boolean          @default(false)
+  blank       Boolean          @default(false)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  document    InteriorDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, key])
+  @@index([documentId, section, position])
+}
+
+model PageTemplate {
+  id          String    @id @default(cuid())
+  workspaceId String
+  key         String
+  name        String
+  kind        String    @default("body")
+  category    String    @default("custom")
+  definition  Json
+  approved    Boolean   @default(false)
+  version     Int       @default(1)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, key])
+}
+
+model CoverDesign {
+  id          String   @id @default(cuid())
+  projectId   String
+  name        String   @default("Cover")
+  design      Json
+  isActive    Boolean  @default(true)
+  revision    Int      @default(1)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, isActive])
+}
+
+model Asset {
+  id          String    @id @default(cuid())
+  workspaceId String
+  projectId   String?
+  kind        String
+  filename    String
+  mimeType    String
+  sizeBytes   Int
+  storageKey  String    @unique
+  sha256      String
+  widthPx     Int?
+  heightPx    Int?
+  source      String    @default("UPLOAD")
+  licenseNote String    @default("")
+  meta        Json?
+  createdAt   DateTime  @default(now())
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project     Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, projectId])
+}
+
+model MetadataDraft {
+  id          String   @id @default(cuid())
+  projectId   String
+  data        Json
+  suggestions Json?
+  isCurrent   Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, isCurrent])
+}
+
+model ValidationRule {
+  id                 String     @id @default(cuid())
+  workspaceId        String?
+  ruleId             String
+  version            Int
+  title              String
+  category           String
+  severity           String
+  blocking           Boolean
+  source             String
+  sourceVerification String
+  lastVerified       String
+  active             Boolean    @default(true)
+  syncedAt           DateTime   @default(now())
+  workspace          Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([ruleId, version])
+}
+
+model ValidationReport {
+  id             String   @id @default(cuid())
+  projectId      String
+  projectVersion Int
+  format         String
+  specVersion    String
+  rulesetVersion String
+  results        Json
+  summary        Json
+  blocked        Boolean
+  createdAt      DateTime @default(now())
+  project        Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  reviews        HumanReview[]
+
+  @@index([projectId, createdAt])
+}
+
+model HumanReview {
+  id         String           @id @default(cuid())
+  reportId   String
+  ruleId     String
+  decision   String
+  note       String
+  reviewerId String
+  createdAt  DateTime         @default(now())
+  report     ValidationReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@unique([reportId, ruleId])
+}
+
+model GenerationJob {
+  id              String     @id @default(cuid())
+  workspaceId     String
+  projectId       String?
+  batchItemId     String?
+  type            String
+  status          JobStatus  @default(QUEUED)
+  stage           String     @default("queued")
+  progress        Int        @default(0)
+  attempts        Int        @default(0)
+  maxAttempts     Int        @default(3)
+  timeoutMs       Int        @default(600000)
+  cancelRequested Boolean    @default(false)
+  error           String?
+  logs            Json       @default("[]")
+  input           Json
+  result          Json?
+  createdById     String?
+  createdAt       DateTime   @default(now())
+  startedAt       DateTime?
+  finishedAt      DateTime?
+  workspace       Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project         Project?   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  batchItem       BatchItem? @relation(fields: [batchItemId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, status, createdAt])
+  @@index([projectId, createdAt])
+}
+
+model BatchJob {
+  id          String      @id @default(cuid())
+  workspaceId String
+  name        String
+  status      BatchStatus @default(DRAFT)
+  settings    Json
+  createdById String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  workspace   Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  items       BatchItem[]
+
+  @@index([workspaceId, createdAt])
+}
+
+model BatchItem {
+  id                    String          @id @default(cuid())
+  batchId               String
+  position              Int
+  projectId             String?         @unique
+  brief                 Json
+  status                BatchItemStatus @default(PENDING)
+  differentiationScore  Float?
+  differentiationNotes  Json?
+  duplicateOfProjectId  String?
+  qualityChecklist      Json?
+  estimatedCostUsd      Decimal         @default(0) @db.Decimal(10, 4)
+  approvedById          String?
+  approvedAt            DateTime?
+  error                 String?
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+  batch                 BatchJob        @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  project               Project?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  jobs                  GenerationJob[]
+
+  @@index([batchId, position])
+}
+
+model ExportArtifact {
+  id               String   @id @default(cuid())
+  projectId        String
+  bundleId         String
+  projectVersion   Int
+  kind             String
+  filename         String
+  mimeType         String
+  storageKey       String   @unique
+  sha256           String
+  sizeBytes        Int
+  specVersion      String
+  rulesetVersion   String?
+  pageCount        Int?
+  trimSize         String?
+  validationStatus String
+  createdAt        DateTime @default(now())
+  project          Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, bundleId])
+}
+
+model ProviderConfig {
+  id              String    @id @default(cuid())
+  workspaceId     String
+  kind            String
+  provider        String
+  model           String
+  baseUrl         String?
+  encryptedApiKey String?
+  apiKeyLast4     String?
+  isDefault       Boolean   @default(false)
+  pricing         Json
+  maxRequestsPerMinute Int  @default(30)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, kind])
+}
+
+model UsageRecord {
+  id               String    @id @default(cuid())
+  workspaceId      String
+  projectId        String?
+  jobId            String?
+  provider         String
+  model            String
+  kind             String
+  operation        String
+  inputTokens      Int       @default(0)
+  outputTokens     Int       @default(0)
+  images           Int       @default(0)
+  estimatedCostUsd Decimal   @default(0) @db.Decimal(10, 6)
+  success          Boolean   @default(true)
+  createdAt        DateTime  @default(now())
+  workspace        Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, createdAt])
+}
+
+model ProjectVersion {
+  id          String   @id @default(cuid())
+  projectId   String
+  version     Int
+  label       String
+  snapshot    Json
+  createdById String?
+  createdAt   DateTime @default(now())
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, version])
+}
+
+model Preset {
+  id          String    @id @default(cuid())
+  workspaceId String
+  name        String
+  kind        String    @default("wizard")
+  data        Json
+  createdAt   DateTime  @default(now())
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+}
+
+model AuditLog {
+  id          String     @id @default(cuid())
+  workspaceId String?
+  userId      String?
+  action      String
+  entityType  String
+  entityId    String?
+  details     Json?
+  ip          String?
+  createdAt   DateTime   @default(now())
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, createdAt])
+}

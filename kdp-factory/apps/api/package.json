@@ -1,0 +1,50 @@
+{
+  "name": "@kdp/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "tsx src/server.ts",
+    "worker": "tsx src/worker.ts",
+    "build": "prisma generate && tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "db:migrate": "prisma migrate deploy",
+    "db:migrate:dev": "prisma migrate dev",
+    "db:seed": "tsx prisma/seed.ts",
+    "test": "vitest run",
+    "postinstall": "prisma generate"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
+  "devDependencies": {
+    "@types/cookie-parser": "^1.4.10",
+    "@types/express": "^4.17.25",
+    "@types/multer": "^2.3.0",
+    "@types/node": "^22.20.5",
+    "@types/supertest": "^7.2.1",
+    "@types/swagger-ui-express": "^4.1.8",
+    "prisma": "^5.22.0",
+    "supertest": "^7.3.1",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.9"
+  },
+  "dependencies": {
+    "@asteasolutions/zod-to-openapi": "^7.3.4",
+    "@aws-sdk/client-s3": "^3.1149.0",
+    "@kdp/core": "0.1.0",
+    "@prisma/client": "^5.22.0",
+    "bullmq": "^6.3.12",
+    "cookie-parser": "^1.4.7",
+    "express": "^4.22.3",
+    "express-rate-limit": "^7.5.1",
+    "helmet": "^8.3.0",
+    "ioredis": "^6.0.0",
+    "jszip": "^3.10.2",
+    "multer": "^1.4.5-lts.1",
+    "swagger-ui-express": "^5.0.1",
+    "zod": "^3.25.76"
+  }
+}
