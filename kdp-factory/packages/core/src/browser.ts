@@ -12,3 +12,6 @@ export { COVER_THEMES, starterCoverDesign } from './cover/starter';
 export * from './metadata';
 export * from './similarity';
 export type { CheckResult, CheckStatus, PreflightReport, Severity, ContentClass } from './validation/result-types';
+export * from './models/pricing';
+export { EDITORIAL_TAGS, type EditorialTag } from './models/seed';
+export type { ModelCapabilities, ImageTask, SizeOption } from './models/capabilities';

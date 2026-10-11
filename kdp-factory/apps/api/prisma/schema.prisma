@@ -71,6 +71,8 @@ model User {
   id           String       @id @default(cuid())
   email        String       @unique
   name         String
+  /// Platform administrators manage the global image-model catalog (PLATFORM_ADMIN_EMAILS).
+  isPlatformAdmin Boolean   @default(false)
   passwordHash String
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
@@ -103,6 +105,9 @@ model Workspace {
   monthlyCostLimitUsd Decimal              @default(50) @db.Decimal(10, 4)
   dailyJobLimit       Int                  @default(200)
   aiDisclosureDefault Boolean              @default(false)
+  preferredImageModelId String?
+  imageGenerations    ImageGeneration[]
+  comparisons         ModelComparison[]
   memberships         Membership[]
   projects            Project[]
   templates           PageTemplate[]
@@ -121,6 +126,8 @@ model Membership {
   userId      String
   workspaceId String
   role        Role      @default(EDITOR)
+  /// Optional per-user monthly AI spending limit within this workspace (USD, estimated).
+  monthlySpendLimitUsd Decimal? @db.Decimal(10, 4)
   createdAt   DateTime  @default(now())
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
@@ -142,6 +149,9 @@ model Project {
   aiDisclosureAck       Boolean            @default(false)
   similarity            Json?
   fingerprint           Json?
+  /// Optional project AI spending limit (USD, estimated + actual).
+  aiSpendLimitUsd       Decimal?           @db.Decimal(10, 4)
+  preferredImageModelId String?
   createdById           String?
   createdAt             DateTime           @default(now())
   updatedAt             DateTime           @updatedAt
@@ -460,6 +470,7 @@ model UsageRecord {
   workspaceId      String
   projectId        String?
   jobId            String?
+  userId           String?
   provider         String
   model            String
   kind             String
@@ -513,4 +524,143 @@ model AuditLog {
   workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId, createdAt])
+}
+
+/// Global catalog of image models (fal.ai + offline mock). Synchronised from fal's Platform API.
+model ImageModel {
+  id                     String            @id @default(cuid())
+  provider               String
+  endpointId             String            @unique
+  displayName            String
+  family                 String            @default("")
+  category               String?
+  description            String            @default("")
+  falStatus              String?
+  /// VERIFIED | CANDIDATE_UNVERIFIED | NOT_FOUND | DEPRECATED | OFFLINE_MOCK
+  availability           String            @default("CANDIDATE_UNVERIFIED")
+  /// SEED | CATALOG_SYNC | BUILT_IN
+  source                 String
+  enabled                Boolean           @default(false)
+  tasks                  String[]
+  capabilities           Json?
+  inputSchema            Json?
+  outputSchema           Json?
+  catalogMetadata        Json?
+  thumbnailUrl           String?
+  modelUrl               String?
+  commercialUseUrl       String?
+  commercialUseNote      String            @default("")
+  editorialTags          String[]
+  knownLimitations       String            @default("")
+  adminNotes             String            @default("")
+  capabilitiesVerifiedAt DateTime?
+  lastSyncedAt           DateTime?
+  lastSyncError          String?
+  lastPriceError         String?
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
+  prices                 ImageModelPrice[]
+  generations            ImageGeneration[]
+
+  @@index([availability, enabled])
+}
+
+model ImageModelPrice {
+  id          String     @id @default(cuid())
+  modelId     String
+  unitPrice   Decimal?   @db.Decimal(14, 8)
+  unitRaw     String?
+  billingUnit String
+  currency    String     @default("USD")
+  /// FAL_PRICING_API | ADMIN_MANUAL
+  source      String
+  sourceUrl   String     @default("")
+  retrievedAt DateTime
+  assumptions Json
+  isCurrent   Boolean    @default(true)
+  createdById String?
+  createdAt   DateTime   @default(now())
+  model       ImageModel @relation(fields: [modelId], references: [id], onDelete: Cascade)
+
+  @@index([modelId, isCurrent])
+}
+
+/// Every image generation request (cover art, comparisons, coloring pages, upscales).
+model ImageGeneration {
+  id               String           @id @default(cuid())
+  workspaceId      String
+  projectId        String?
+  userId           String?
+  jobId            String?
+  comparisonId     String?
+  modelId          String?
+  endpointId       String
+  provider         String
+  purpose          String
+  status           String           @default("PENDING")
+  input            Json
+  settings         Json
+  estimate         Json
+  estimateStatus   String
+  estimatedCostUsd Decimal?         @db.Decimal(12, 6)
+  actualCostUsd    Decimal?         @db.Decimal(12, 6)
+  /// FAL_BILLABLE_UNITS_HEADER | MOCK | null (unknown)
+  actualCostSource String?
+  billableUnits    Float?
+  requestId        String?
+  assetIds         String[]
+  outputMeta       Json?
+  error            String?
+  durationMs       Int?
+  confirmedByUser  Boolean          @default(false)
+  createdAt        DateTime         @default(now())
+  finishedAt       DateTime?
+  workspace        Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  model            ImageModel?      @relation(fields: [modelId], references: [id], onDelete: SetNull)
+  comparison       ModelComparison? @relation(fields: [comparisonId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, createdAt])
+  @@index([projectId, createdAt])
+  @@index([comparisonId])
+}
+
+model ModelComparison {
+  id          String            @id @default(cuid())
+  workspaceId String
+  projectId   String?
+  name        String
+  request     Json
+  modelIds    String[]
+  status      String            @default("PENDING")
+  ratings     Json?
+  createdById String?
+  createdAt   DateTime          @default(now())
+  workspace   Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  generations ImageGeneration[]
+
+  @@index([workspaceId, createdAt])
+}
+
+/// Aggregated spend reported by fal's usage API (requires an Admin-scope key).
+model ProviderUsageReport {
+  id          String   @id @default(cuid())
+  provider    String
+  endpointId  String
+  periodStart DateTime
+  periodEnd   DateTime
+  quantity    Float?
+  unit        String?
+  unitPrice   Float?
+  costTotal   Float?
+  currency    String   @default("USD")
+  raw         Json
+  retrievedAt DateTime @default(now())
+
+  @@unique([provider, endpointId, periodStart, periodEnd])
+}
+
+model SystemState {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
 }

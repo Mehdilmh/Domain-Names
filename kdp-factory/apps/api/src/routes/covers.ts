@@ -9,6 +9,8 @@ import { defineRoute, IdParams } from '../lib/route';
 import { currentMetadata } from '../services/build';
 import { projectCoverGeometry } from '../services/cover';
 import { getProject } from '../services/projects';
+import { checkConfirmation, NormalizedRequestSchema, prepareGeneration } from '../services/image-generation';
+import { createJob } from '../services/jobs';
 
 export const coverRouter = Router();
 const CoverParams = z.object({ id: z.string(), coverId: z.string() });
@@ -139,3 +141,83 @@ defineRoute(
     return { official, geometry: await projectCoverGeometry(p.id) };
   },
 );
+
+/* ------------------------------- AI cover art (model library) ------------------------------- */
+
+/**
+ * The art target comes from the verified cover geometry — never from the image model. The model
+ * only paints pixels; trim, bleed, spine, barcode area and safe zones stay with the layout engine.
+ */
+function artTarget(geom: Awaited<ReturnType<typeof projectCoverGeometry>>, scope: 'front' | 'wrap') {
+  const bleed = geom.bleedIn;
+  const f = geom.panels.front;
+  const wIn = scope === 'wrap' ? geom.widthIn : f.w + bleed;
+  const hIn = scope === 'wrap' ? geom.heightIn : f.h + 2 * bleed;
+  return { scope, widthIn: wIn, heightIn: hIn, aspect: wIn / hIn, idealWidthPx: Math.round(wIn * 300), idealHeightPx: Math.round(hIn * 300), geometrySource: geom.source };
+}
+
+defineRoute(coverRouter, { method: 'get', path: '/projects/:id/cover-art/target', summary: 'Art area (front panel + bleed, or full wrap) and the pixel size needed for 300 DPI', tag: 'Covers', params: IdParams, query: z.object({ scope: z.enum(['front', 'wrap']).default('front') }) }, async ({ ws, params, query }) => {
+  await getProject(ws.workspaceId, params.id);
+  const geom = await projectCoverGeometry(params.id);
+  if (geom.source === 'UNRESOLVED') throw conflict('Cover geometry is unresolved (enter official hardcover values first).');
+  return artTarget(geom, query.scope);
+});
+
+const CoverArtBody = z.object({
+  modelId: z.string().max(64),
+  scope: z.enum(['front', 'wrap']).default('front'),
+  request: NormalizedRequestSchema,
+  confirmation: z.object({ acceptedEstimateUsd: z.number().min(0).nullable(), acceptUnverifiedCost: z.boolean().default(false) }).optional(),
+});
+
+defineRoute(coverRouter, { method: 'post', path: '/projects/:id/cover-art', summary: 'Generate (or revise via image-to-image) cover background art with a chosen model after confirming the estimate', tag: 'Covers', params: IdParams, body: CoverArtBody, status: 202 }, async ({ ws, params, body, req }) => {
+  const p = await getProject(ws.workspaceId, params.id);
+  const geom = await projectCoverGeometry(p.id);
+  if (geom.source === 'UNRESOLVED') throw conflict('Cover geometry is unresolved (enter official hardcover values first).');
+  const t = artTarget(geom, body.scope);
+  // Aspect always follows the cover geometry; the pixel size is a request the model may round.
+  const scale = Math.min(1, 2048 / t.idealWidthPx, 2048 / t.idealHeightPx);
+  const request = {
+    ...body.request,
+    aspect: t.aspect,
+    widthPx: body.request.widthPx ?? Math.round((t.idealWidthPx * scale) / 8) * 8,
+    heightPx: body.request.heightPx ?? Math.round((t.idealHeightPx * scale) / 8) * 8,
+    prompt: /no text/i.test(body.request.prompt) ? body.request.prompt : `${body.request.prompt}. Background artwork only: no text, no letters, no numbers, no logos.`,
+  };
+  const prep = await prepareGeneration(ws.workspaceId, body.modelId, request);
+  if (prep.errors.length) throw badRequest(`Settings are not valid for ${prep.model.displayName}`, { errors: prep.errors });
+  checkConfirmation(prep.estimate, body.confirmation);
+  const job = await createJob({
+    workspaceId: ws.workspaceId,
+    projectId: p.id,
+    exclusive: false,
+    type: 'IMAGE_GENERATE',
+    userId: ws.user.id,
+    usesAi: prep.model.provider !== 'mock',
+    input: { purpose: 'COVER_ART', userId: ws.user.id, items: [{ key: 'cover-art', modelId: prep.model.id, request, confirmation: body.confirmation! }] } as Prisma.InputJsonValue,
+  });
+  await audit(req, 'cover.art.generate', 'Project', p.id, { model: prep.model.endpointId, estimate: prep.estimate.total, scope: body.scope });
+  return { jobId: job.id, estimate: prep.estimate, target: t };
+});
+
+defineRoute(coverRouter, { method: 'post', path: '/projects/:id/covers/:coverId/apply-art', summary: 'Place an image asset as the background art layer (text layers stay live and above it)', tag: 'Covers', params: CoverParams, body: z.object({ assetId: z.string().max(64), scope: z.enum(['front', 'wrap']).default('front'), revision: z.number().int() }) }, async ({ ws, params, body, req }) => {
+  await getProject(ws.workspaceId, params.id);
+  const c = await getCover(params.id, params.coverId);
+  if (c.revision !== body.revision) throw conflict('Cover changed since you loaded it. Reload to continue.', { revision: c.revision });
+  const a = await prisma.asset.findFirst({ where: { id: body.assetId, workspaceId: ws.workspaceId } });
+  if (!a || !a.mimeType.startsWith('image/')) throw notFound('Image asset');
+  const geom = await projectCoverGeometry(params.id);
+  const design = CoverDesign.parse(c.design);
+  const existing = design.layers.find((l) => l.id === 'cover-art');
+  if (existing?.locked) throw badRequest('The cover art layer is locked.');
+  const bleed = geom.bleedIn;
+  const t = artTarget(geom, body.scope);
+  const layer = body.scope === 'wrap'
+    ? { id: 'cover-art', name: 'Cover art', type: 'image', anchor: 'canvas', x: 0, y: 0, w: t.widthIn, h: t.heightIn, assetId: a.id, fit: 'cover', locked: false }
+    : { id: 'cover-art', name: 'Cover art', type: 'image', anchor: 'front', x: geom.direction === 'RTL' ? -bleed : 0, y: -bleed, w: t.widthIn, h: t.heightIn, assetId: a.id, fit: 'cover', locked: false };
+  const next = CoverDesign.parse({ ...design, layers: [layer, ...design.layers.filter((l) => l.id !== 'cover-art')] });
+  const layout = layoutCover(next, geom, await assetInfo(ws.workspaceId, next));
+  const updated = await prisma.coverDesign.update({ where: { id: c.id }, data: { design: next as unknown as Prisma.InputJsonValue, revision: { increment: 1 } } });
+  await audit(req, 'cover.art.apply', 'CoverDesign', c.id, { assetId: a.id, scope: body.scope });
+  return { cover: updated, warnings: layout.warnings };
+});

@@ -19,3 +19,6 @@ export * from './export/metadata';
 export * from './export/manifest';
 export * from './pipeline';
 export * from './fixtures';
+export * from './models/pricing';
+export * from './models/capabilities';
+export * from './models/seed';

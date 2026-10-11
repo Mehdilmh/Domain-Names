@@ -11,10 +11,10 @@ export async function assertDailyJobLimit(workspaceId: string) {
   if (n >= ws.dailyJobLimit) throw new HttpError(429, 'QUOTA_JOBS', `Daily job limit of ${ws.dailyJobLimit} reached. Adjust it in Settings → Usage limits.`);
 }
 
-export async function createJob(opts: { workspaceId: string; projectId?: string | null; batchItemId?: string | null; type: string; input: Prisma.InputJsonValue; userId?: string | null; maxAttempts?: number; usesAi?: boolean }) {
+export async function createJob(opts: { workspaceId: string; projectId?: string | null; batchItemId?: string | null; type: string; input: Prisma.InputJsonValue; userId?: string | null; maxAttempts?: number; usesAi?: boolean; exclusive?: boolean }) {
   await assertDailyJobLimit(opts.workspaceId);
   if (opts.usesAi) await assertWithinQuota(opts.workspaceId);
-  if (opts.projectId) {
+  if (opts.projectId && opts.exclusive !== false) {
     const active = await prisma.generationJob.findFirst({ where: { projectId: opts.projectId, status: { in: ['QUEUED', 'RUNNING'] }, type: opts.type } });
     if (active) throw conflict(`A ${opts.type.toLowerCase()} job is already in progress for this project.`, { jobId: active.id });
   }

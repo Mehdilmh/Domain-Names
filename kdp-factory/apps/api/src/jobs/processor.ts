@@ -5,13 +5,14 @@ import { HttpError } from '../lib/errors';
 import { withTimeout } from '../providers/retry';
 import { ProviderError } from '../providers/types';
 import { runBatchItem } from '../services/batch';
+import { runImageJob } from '../services/image-jobs';
 import { buildAndValidate } from '../services/build';
 import { createExport, ExportKind } from '../services/exports';
 import { stageContent, stageCover, stageInterior, stageMetadata, stageResearch, type GenCtx } from '../services/generation';
 import { advanceStatus } from '../services/projects';
 import { GenerationSettings } from '../services/schemas';
 
-export const JOB_TYPES = ['GENERATE', 'VALIDATE', 'EXPORT', 'BATCH_ITEM'] as const;
+export const JOB_TYPES = ['GENERATE', 'VALIDATE', 'EXPORT', 'BATCH_ITEM', 'IMAGE_GENERATE', 'MODEL_COMPARE'] as const;
 export const JobType = z.enum(JOB_TYPES);
 
 export class CancelledError extends Error {}
@@ -116,6 +117,12 @@ export async function processJob(jobId: string): Promise<void> {
         await save({ result: result as Prisma.InputJsonValue });
         break;
       }
+      case 'IMAGE_GENERATE':
+      case 'MODEL_COMPARE':
+        await save({ stage: 'images' });
+        await runImageJob(job, () => isCancelled(jobId), (m) => void appendLog(jobId, m), ctrl.signal);
+        if (await isCancelled(jobId)) throw new CancelledError('Cancelled by user');
+        break;
       case 'BATCH_ITEM':
         await runBatchItem(job, (project, stages) => runStages(project, stages), (m) => appendLog(jobId, m));
         break;

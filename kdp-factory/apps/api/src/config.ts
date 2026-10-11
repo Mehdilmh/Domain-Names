@@ -19,6 +19,13 @@ const Env = z.object({
   OPENAI_COMPATIBLE_API_KEY: z.string().optional(),
   OPENAI_COMPATIBLE_BASE_URL: z.string().default('https://api.openai.com/v1'),
   FAL_KEY: z.string().optional(),
+  /** Admin-scope fal key — only needed for provider-reported usage/cost (fal usage API). */
+  FAL_ADMIN_KEY: z.string().optional(),
+  FAL_PLATFORM_API_URL: z.string().default('https://api.fal.ai/v1'),
+  /** Comma-separated emails that manage the global model catalog. */
+  PLATFORM_ADMIN_EMAILS: z.string().default(''),
+  CATALOG_REFRESH_HOURS: z.coerce.number().min(0).default(24),
+  IMAGE_DOWNLOAD_MAX_MB: z.coerce.number().default(60),
   WEB_ORIGIN: z.string().default('http://localhost:5173'),
   SESSION_TTL_DAYS: z.coerce.number().default(14),
   MAX_UPLOAD_MB: z.coerce.number().default(25),

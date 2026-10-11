@@ -134,3 +134,32 @@ export class MockImageProvider implements ImageProvider {
     return { bytes: rasterizeSvg(svg, w), mimeType: 'image/png', model: this.model };
   }
 }
+
+/**
+ * Offline mock output for the image-model library (`mock/line-art`, `mock/cover-art`).
+ * Procedural shapes only — not AI. Line art is black outlines on white so the coloring
+ * pipeline (QC, processing, interior) can be exercised end to end without API keys.
+ */
+export async function mockImage(endpointId: string, seed: string, w: number, h: number): Promise<Uint8Array> {
+  if (endpointId === 'mock/line-art') {
+    const stroke = Math.max(3, Math.round(Math.min(w, h) / 160));
+    const shapes = Array.from({ length: 6 }, (_, i) => {
+      const x = 0.15 + ((fnv1a(seed + 'x' + i) % 1000) / 1000) * 0.7;
+      const y = 0.15 + ((fnv1a(seed + 'y' + i) % 1000) / 1000) * 0.7;
+      const r = 0.06 + ((fnv1a(seed + 'r' + i) % 1000) / 1000) * 0.12;
+      const k = fnv1a(seed + 'k' + i) % 3;
+      const R = r * Math.min(w, h);
+      if (k === 0) return `<circle cx="${x * w}" cy="${y * h}" r="${R}"/>`;
+      if (k === 1) return `<rect x="${x * w - R}" y="${y * h - R}" width="${2 * R}" height="${2 * R}" rx="${R / 4}"/>`;
+      const pts = Array.from({ length: 5 }, (_, j) => {
+        const a = (Math.PI * 2 * j) / 5 - Math.PI / 2;
+        return `${x * w + R * Math.cos(a)},${y * h + R * Math.sin(a)}`;
+      }).join(' ');
+      return `<polygon points="${pts}"/>`;
+    }).join('');
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><rect width="${w}" height="${h}" fill="#fff"/><g fill="none" stroke="#000" stroke-width="${stroke}" stroke-linejoin="round">${shapes}</g></svg>`;
+    return rasterizeSvg(svg, w);
+  }
+  const r = await new MockImageProvider().generate({ prompt: seed, seed, widthPx: w, heightPx: h } as ImageRequest);
+  return r.bytes;
+}
