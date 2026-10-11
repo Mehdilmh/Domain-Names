@@ -13,7 +13,7 @@ export const authRouter = Router();
 authRouter.use(['/auth/login', '/auth/register'], rateLimit({ windowMs: 15 * 60_000, limit: process.env.NODE_ENV === 'test' ? 1000 : 20, standardHeaders: true, legacyHeaders: false }));
 
 const Password = z.string().min(10, 'Use at least 10 characters').max(200);
-const Register = z.object({ email: z.string().email().max(200).transform((e) => e.toLowerCase()), name: z.string().trim().min(1).max(100), password: Password, workspaceName: z.string().trim().min(1).max(100).optional() });
+const Register = z.object({ email: z.string().email().max(200).transform((e) => e.toLowerCase()), name: z.string().trim().min(1).max(100), password: Password, workspaceName: z.string().trim().max(100).optional().transform((v) => v || undefined) });
 const Login = z.object({ email: z.string().email().transform((e) => e.toLowerCase()), password: z.string().min(1).max(200) });
 const Me = z.object({ user: z.object({ id: z.string(), email: z.string(), name: z.string() }), workspaces: z.array(z.object({ id: z.string(), name: z.string(), role: z.string() })), activeWorkspaceId: z.string().nullable() });
 

@@ -1,4 +1,5 @@
-import { layoutDocument, type AssetInfo, type LayoutResult } from '@kdp/core';
+import { layoutDocument, type AssetInfo, type LaidOutPage, type LayoutResult } from '@kdp/core';
+import { getStorage } from '../lib/storage';
 import { prisma } from '../db';
 import { badRequest } from '../lib/errors';
 import { loadDocument } from './interior';
@@ -30,4 +31,39 @@ export async function cachedLayout(projectId: string): Promise<{ layout: LayoutR
   cache.set(key, layout);
   while (cache.size > MAX) cache.delete(cache.keys().next().value!);
   return { layout, revision };
+}
+
+/** Small byte-bounded LRU for rendered preview PNGs. */
+class PngCache {
+  private m = new Map<string, Uint8Array>();
+  private bytes = 0;
+  constructor(private maxBytes = 64 * 1024 * 1024) {}
+  get(k: string) {
+    const v = this.m.get(k);
+    if (v) {
+      this.m.delete(k);
+      this.m.set(k, v);
+    }
+    return v;
+  }
+  set(k: string, v: Uint8Array) {
+    this.m.set(k, v);
+    this.bytes += v.byteLength;
+    while (this.bytes > this.maxBytes && this.m.size > 1) {
+      const [oldK, oldV] = this.m.entries().next().value!;
+      this.m.delete(oldK);
+      this.bytes -= oldV.byteLength;
+    }
+  }
+}
+export const pngCache = new PngCache();
+
+/** data: URIs for the images used on a page (workspace-scoped). */
+export async function pageAssetDataUris(workspaceId: string, page: LaidOutPage): Promise<Record<string, string>> {
+  const ids = [...new Set(page.ops.filter((o) => o.op === 'image').map((o) => (o as { assetId: string }).assetId))];
+  if (!ids.length) return {};
+  const rows = await prisma.asset.findMany({ where: { workspaceId, id: { in: ids } } });
+  const out: Record<string, string> = {};
+  for (const a of rows) out[a.id] = `data:${a.mimeType};base64,${Buffer.from(await getStorage().get(a.storageKey)).toString('base64')}`;
+  return out;
 }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { checkMetadata, findSimilar, interiorFingerprint, isbnValid, jaccard, MetadataDraft, minhash, minhashSimilarity, shingles, titleSimilarity, titlesConsistent } from '../src/index';
+import { checkMetadata, findSimilar, interiorFingerprint, isbnValid, jaccard, MetadataDraft, type MetadataDraftInput, minhash, minhashSimilarity, shingles, titleSimilarity, titlesConsistent } from '../src/index';
 
-const md = (o: Partial<MetadataDraft> = {}) => MetadataDraft.parse({ title: 'Quiet Mornings', author: 'Ava', description: 'A journal.', ...o });
+const md = (o: Partial<MetadataDraftInput> = {}) => MetadataDraft.parse({ title: 'Quiet Mornings', author: 'Ava', description: 'A journal.', ...o });
 
 describe('metadata validation', () => {
   it('passes clean metadata', () => {

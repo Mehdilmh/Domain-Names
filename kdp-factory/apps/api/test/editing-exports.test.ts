@@ -51,6 +51,13 @@ describe('interior editor API', () => {
     });
     expect(svg.headers['content-type']).toMatch(/svg/);
     expect(svg.body).toContain('viewBox="0 0 432 648"');
+    const png = await agent.get(`/api/projects/${p.body.id}/interior/pages/3/preview.png?dpi=50`).buffer(true).parse((res, cb) => {
+      const chunks: Buffer[] = [];
+      res.on('data', (c: Buffer) => chunks.push(c));
+      res.on('end', () => cb(null, Buffer.concat(chunks)));
+    });
+    expect(png.headers['content-type']).toBe('image/png');
+    expect((png.body as Buffer).readUInt32BE(16)).toBe(300); // 6in × 50dpi
   });
 
   it('regenerates layout when the trim size changes and rejects invalid combinations', async () => {

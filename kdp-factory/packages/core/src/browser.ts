@@ -11,4 +11,4 @@ export * from './cover/geometry';
 export { COVER_THEMES, starterCoverDesign } from './cover/starter';
 export * from './metadata';
 export * from './similarity';
-export type { CheckResult, CheckStatus, PreflightReport, Severity, ContentClass } from './validation/types';
+export type { CheckResult, CheckStatus, PreflightReport, Severity, ContentClass } from './validation/result-types';

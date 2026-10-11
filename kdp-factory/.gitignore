@@ -9,3 +9,6 @@ coverage/
 *.log
 playwright-report/
 test-results/
+storage-test/
+apps/web/test-results/
+apps/web/playwright-report/

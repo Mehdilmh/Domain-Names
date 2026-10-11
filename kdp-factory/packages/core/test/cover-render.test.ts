@@ -20,7 +20,7 @@ describe('cover layout, SVG, and PDF', () => {
   it('omits spine text below 80 pages and flags manual spine text', () => {
     const g = geom(60);
     const d = starterCoverDesign(g, { title: 'Thin', author: 'A' });
-    expect(d.layers.find((x) => x.role === 'spine' || x.anchor === 'spine')).toBeUndefined();
+    expect(d.layers.find((x) => (x.type === 'text' && x.role === 'spine') || x.anchor === 'spine')).toBeUndefined();
     const withSpine = CoverDesign.parse({ ...d, layers: [...d.layers, { id: 's', type: 'text', role: 'spine', anchor: 'spine', x: 0, y: 1, w: 0.1, h: 4, text: 'Thin' }] });
     expect(layoutCover(withSpine, g).warnings.some((w) => w.code === 'SPINE_TEXT_NOT_ALLOWED')).toBe(true);
   });

@@ -1,4 +1,4 @@
-import { BUILT_IN_TEMPLATES, Chapter, DocumentSettings, InteriorDocument, PageTemplate, renderPageSvg } from '@kdp/core';
+import { BUILT_IN_TEMPLATES, Chapter, DocumentSettings, InteriorDocument, layoutDocument, PageTemplate, rasterizeSvg, renderPageSvg } from '@kdp/core';
 import type { Prisma } from '@prisma/client';
 import { Router } from 'express';
 import { z } from 'zod';
@@ -7,7 +7,7 @@ import { audit } from '../lib/audit';
 import { badRequest, notFound } from '../lib/errors';
 import { defineRoute, IdParams } from '../lib/route';
 import { applyPageOp, loadDocument, saveDocument, type PageOp } from '../services/interior';
-import { cachedLayout } from '../services/preview';
+import { cachedLayout, pageAssetDataUris, pngCache } from '../services/preview';
 import { getProject } from '../services/projects';
 
 export const interiorRouter = Router();
@@ -95,6 +95,32 @@ defineRoute(
   },
 );
 
+/**
+ * Raster preview (PNG) rendered on the server with the bundled fonts and embedded images, so it
+ * matches the PDF exactly. (Browsers do not load fonts or images inside SVGs shown via <img>.)
+ */
+defineRoute(
+  interiorRouter,
+  { method: 'get', path: '/projects/:id/interior/pages/:page/preview.png', summary: 'Print-accurate PNG preview of one page', tag: 'Interior', params: z.object({ id: z.string(), page: z.coerce.number().int().min(1) }), query: z.object({ guides: z.enum(['0', '1']).default('1'), dpi: z.coerce.number().int().min(12).max(300).default(96) }), raw: true, responseContentType: 'image/png' },
+  async ({ ws, params, query, res }) => {
+    const project = await getProject(ws.workspaceId, params.id);
+    const { layout, revision } = await cachedLayout(params.id);
+    const page = layout.pages[params.page - 1];
+    if (!page) throw notFound('Page');
+    const key = `${params.id}:${revision}:${layout.spec.input.trimId}:${layout.spec.input.bleed}:${params.page}:${query.dpi}:${query.guides}`;
+    let png = pngCache.get(key);
+    if (!png) {
+      const hrefs = await pageAssetDataUris(project.workspaceId, page);
+      const svg = renderPageSvg(page, { guides: query.guides === '1', assetHref: (id) => hrefs[id], gray: layout.spec.input.ink === 'BLACK_WHITE' });
+      png = rasterizeSvg(svg, Math.round((page.widthPt / 72) * query.dpi));
+      pngCache.set(key, png);
+    }
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Cache-Control', 'private, max-age=300');
+    res.send(Buffer.from(png));
+  },
+);
+
 /* --------------------------------------- Templates ------------------------------------------ */
 
 defineRoute(interiorRouter, { method: 'get', path: '/templates', summary: 'Built-in and workspace page templates', tag: 'Templates' }, async ({ ws }) => {
@@ -126,3 +152,16 @@ defineRoute(interiorRouter, { method: 'delete', path: '/templates/:id', summary:
   await audit(req, 'template.delete', 'PageTemplate', t.id);
   return { ok: true };
 });
+
+defineRoute(
+  interiorRouter,
+  { method: 'post', path: '/templates/preview', summary: 'Render a template (saved or unsaved) on a sample page; returns SVG and layout warnings', tag: 'Templates', body: z.object({ template: z.unknown(), trimId: z.string().max(20).default('6x9'), fields: z.record(z.union([z.string(), z.number(), z.boolean()])).default({}) }) },
+  async ({ body }) => {
+    const t = PageTemplate.parse({ id: '__preview', ...(body.template as object) });
+    const l = layoutDocument(
+      { settings: { title: 'Sample Title', author: 'Sample Author' }, body: { kind: 'pages', pages: [{ id: 'p1', templateId: '__preview', fields: body.fields }] }, templates: [t], frontMatter: [] },
+      { format: { format: 'PAPERBACK', trimId: body.trimId, ink: 'BLACK_WHITE', paper: 'WHITE', bleed: false } },
+    );
+    return { svg: renderPageSvg(l.pages[0], { guides: true, fontBaseUrl: '/api/fonts/' }), warnings: l.warnings.filter((w) => w.code !== 'MARGIN_ADJUSTED') };
+  },
+);
