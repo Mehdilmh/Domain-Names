@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { InteriorDocumentInput, PageInstanceInput, PageTemplateInput } from '../interior/schema';
+import type { InteriorDocumentInput, PageInstanceInput } from '../interior/schema';
 
 /**
  * Coloring Book Studio — deterministic building blocks: audience/theme/style presets, the style
@@ -200,15 +200,6 @@ export type ColoringInteriorSettings = z.infer<typeof ColoringInteriorSettings>;
 
 export const COLORING_TRIMS = ['8.5x11', '8x10', '8.5x8.5', '8.25x8.25', '8.27x11.69', '7.5x9.25', '7x10', '6x9', '8.25x6'] as const;
 
-const COLORING_TEMPLATE: PageTemplateInput = {
-  id: 'coloring-page',
-  name: 'Coloring page',
-  kind: 'body',
-  category: 'coloring',
-  showRunningHeader: false,
-  elements: [],
-};
-
 /**
  * Builds the interior document from approved pages in order. Illustrations count and page count
  * are distinct: in single-sided mode each illustration gets a blank reverse.
@@ -220,7 +211,7 @@ export function buildColoringDocument(pages: { id: string; assetId: string; conc
   for (const p of pages) {
     if (s.rectoOnly && !s.singleSided && body.length % 2 === 1) body.push({ id: `pad-${p.id}`, templateId: null, blank: true });
     const img = { id: `img-${p.id}`, type: 'image' as const, assetId: p.assetId, fit: 'contain' as const, widthRatio: s.scale, fullBleed: s.fullBleed, height: { mode: 'fill' as const, weight: 30 } };
-    body.push({ id: `page-${p.id}`, templateId: 'coloring-page', elements: s.scale < 1 || s.verticalAlign !== 'center' ? [spacer('t', topW), img, spacer('b', botW)] : [img] });
+    body.push({ id: `page-${p.id}`, templateId: null, elements: s.scale < 1 || s.verticalAlign !== 'center' ? [spacer('t', topW), img, spacer('b', botW)] : [img] });
     if (s.singleSided) body.push({ id: `rev-${p.id}`, templateId: null, blank: true });
   }
   const front: PageInstanceInput[] = [];
@@ -254,7 +245,6 @@ export function buildColoringDocument(pages: { id: string; assetId: string; conc
     frontMatter: front,
     body: { kind: 'pages', pages: body },
     backMatter: back,
-    templates: [{ ...COLORING_TEMPLATE, showPageNumber: s.pageNumbers }],
   };
 }
 

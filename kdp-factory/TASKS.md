@@ -4,7 +4,7 @@ Status legend: ✅ implemented **and** covered by automated tests · 🟢 implem
 manually in the browser (no dedicated automated test) · ⚠️ partial / limitation documented ·
 ❌ not implemented.
 
-Last full verification run: core **74/74**, API **33/33**, browser E2E **1/1** (Playwright,
+Last full verification run: core **99/99**, API **55/55**, browser E2E **2/2** (Playwright,
 Chromium), typecheck clean for all three workspaces, production web build OK.
 
 ## Milestone 1 — Foundation
@@ -93,8 +93,49 @@ Chromium), typecheck clean for all three workspaces, production web build OK.
 | End-to-end workflow (API) and browser E2E | ✅ | `e2e-workflow.test.ts`, `apps/web/e2e/workflow.spec.ts` |
 | Deployment, backup/restore guidance, docker-compose for services | ✅ | README |
 
+## Milestone 7 — Image model library (fal.ai) with live pricing
+
+| Task | Status | Evidence |
+|---|---|---|
+| Investigate fal's official catalog/pricing data (Platform API models, pricing, usage; SDK queue; billable-units header) | ✅ | README “Image model library”; endpoints documented |
+| Catalog sync via `GET /v1/models` (find ≤ 50 ids, category search, cursor pagination, `expand=openapi-3.0`); not-found ids disabled | ✅ (simulated HTTP) | `image-models.test.ts` |
+| Capabilities derived from each endpoint's OpenAPI schema (sizes, ratios, resolutions, negative prompt, references, masks, seeds, tasks with evidence) | ✅ | `models.test.ts` |
+| Pricing: units normalised (image / megapixel / token / second / request), never relabelled; source, currency, retrieval time, assumptions; stale detection; history | ✅ | `models.test.ts`, `image-models.test.ts` |
+| “Price unavailable” + explicit acceptance; estimates for 1/4/10/50/100; token models need assumptions | ✅ | API + core tests |
+| Actual cost from `X-Fal-Billable-Units`; “not reported” otherwise; provider usage sync (Admin key) | ✅ header path tested / ⚠️ usage endpoint parsing untested against live data | `image-models.test.ts` |
+| SDK adapter (server only), schema validation, timeouts, retries, error mapping, resumable request ids (no double charge) | ✅ (simulated HTTP) | `image-models.test.ts` |
+| Spending limits: workspace daily/monthly, project, member, book | ✅ | API tests |
+| Gallery: search, filters (cheapest, concept drafts, illustrated, photorealistic, typography, editing, references, high-res, commercial info, t2i, i2i…), cards, live estimate, Select/preferred | 🟢 | browser walkthrough |
+| Compare models with one brief (one image each, confirmed total, actual cost, ratings, set preferred) | ✅ API / 🟢 UI | `image-models.test.ts` |
+| Platform admin: sync, enable, tags, limitations, commercial-use link, manual price with https source, assumptions | ✅ API / 🟢 UI | `image-models.test.ts` |
+| Cover art flow: brief → model → estimate → confirm → generate → preview/revise (i2i) → placed under live text; geometry from the verified cover spec | ✅ API / 🟢 UI | `image-models.test.ts`, browser |
+| **Live fal calls (≥ 3 models)** | ❌ not done | `fal.ai`, `api.fal.ai`, `queue.fal.run` were unreachable from the build environment and no key was available. All fal behaviour is tested against a simulated HTTP layer shaped after the documented API. Run a catalog sync and a test generation with a real `FAL_KEY` before relying on it. |
+
+## Milestone 8 — Coloring Book Studio
+
+| Task | Status | Evidence |
+|---|---|---|
+| Dashboard: stages, approved/target, est. vs actual cost, progress, duplicate, archive, search/sort/filter | ✅ API / ✅ E2E | `coloring.test.ts`, `coloring.spec.ts` |
+| Wizard: concept, audience presets (Toddlers→Seniors), theme presets, art direction controls, reusable style profiles, trim, single-sided, model, budget | ✅ | API + E2E |
+| Deterministic prompt builder with coloring defaults; hand-edited prompts preserved; repeated-concept detection | ✅ | core + API tests |
+| Page plan per page: concept, prompt, negative prompt, model, params, references, versions, cost, QC | ✅ | `coloring.test.ts` |
+| Batch generation as a background job: confirmed estimate, budget cap, resumable, finished pages preserved, modes new/variation/edit | ✅ (offline mock + priced mock) | `coloring.test.ts` |
+| Review: approve/reject/favorite/duplicate/replace/restore/compare versions/re-process, bulk actions | ✅ API / 🟢 UI | API test, E2E |
+| QC: decode, DPI, aspect, alpha (automated); background, color, gray, contrast, ink, line weight, cropping, empty areas, perceptual-hash duplicates (heuristic); text/watermark/quality/originality (manual) | ✅ | `coloring.test.ts` (synthetic images) |
+| Processing (originals preserved): flatten, grayscale, normalise, denoise, threshold, trim, pad-to-aspect, resample to 300 DPI | ✅ | `coloring.test.ts` |
+| Override of failed QC requires a note; recorded | ✅ | `coloring.test.ts` |
+| Interior from approved pages: trims, single-sided blank reverses, recto placement, front/back matter, scale/alignment, real PDF, preview | ✅ | core + API + E2E |
+| Cover: existing full-wrap designer + AI art dialog | ✅ (reused) | Milestone 3/7 |
+| Unified preflight: automated / visual warnings / manual / official-needs-verification, no approval guarantee | ✅ | `coloring.test.ts`, E2E |
+| Metadata: back-cover copy, coloring checklist (no invented demand, trademark reminder, AI disclosure) | 🟢 | browser |
+| Export package: interior PDF, cover PDF, editable SVG, proof, page images (original + print), prompt log CSV, QC report JSON/HTML, metadata, manifest | ✅ | `coloring.test.ts` |
+| AI upscaling via an upscale model | ⚠️ | upscale models are in the catalog, but the studio's “resample to 300 DPI” is Lanczos resampling (stated as adding no detail) |
+| Automatic text/watermark detection | ❌ | listed as a manual check; no OCR is bundled |
+
 ## Known limitations / next steps
 
+- fal.ai integration is untested against the live service (see Milestone 7). Seed model ids and the exact `/v1/models/usage` response shape must be confirmed with a real key.
+- The original phase-13 request was cut off after “Editable SVG cover, when supported”; anything listed after that point was not received.
 - Kindle **fixed-layout** eBooks (Kindle Create / Kids' Book Creator workflows) are not generated; only reflowable EPUB. EPUB validation is a structural subset, not EPUBCheck.
 - Covers are produced in RGB; no PDF/X or CMYK conversion. KDP accepts standard PDFs, but colour-critical work should be proofed.
 - Rate limiting and provider throttling are per process (no shared Redis store yet).

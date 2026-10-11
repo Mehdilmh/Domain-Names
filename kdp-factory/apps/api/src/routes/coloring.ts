@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { prisma } from '../db';
 import { audit } from '../lib/audit';
 import { badRequest, conflict, HttpError, notFound } from '../lib/errors';
-import { defineRoute, IdParams } from '../lib/route';
+import { defineRoute, IdParams, queryBool } from '../lib/route';
 import { ProcessingOptions, type QcResult } from '../services/coloring-image';
 import {
   addPages,
@@ -47,7 +47,7 @@ defineRoute(coloringRouter, { method: 'get', path: '/coloring/presets', summary:
 
 defineRoute(
   coloringRouter,
-  { method: 'get', path: '/coloring', summary: 'Coloring books dashboard (search, sort, filter)', tag: 'Coloring', query: z.object({ q: z.string().max(100).optional(), stage: z.string().max(20).optional(), sort: z.enum(['updated', 'created', 'title', 'approved']).default('updated'), archived: z.coerce.boolean().default(false) }) },
+  { method: 'get', path: '/coloring', summary: 'Coloring books dashboard (search, sort, filter)', tag: 'Coloring', query: z.object({ q: z.string().max(100).optional(), stage: z.string().max(20).optional(), sort: z.enum(['updated', 'created', 'title', 'approved']).default('updated'), archived: queryBool(false) }) },
   async ({ ws, query }) => {
     const books = await prisma.coloringBook.findMany({
       where: { workspaceId: ws.workspaceId, stage: query.stage || undefined, project: { archivedAt: query.archived ? { not: null } : null, title: query.q ? { contains: query.q, mode: 'insensitive' } : undefined } },

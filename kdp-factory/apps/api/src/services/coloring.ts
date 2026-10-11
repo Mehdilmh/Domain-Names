@@ -110,7 +110,7 @@ export async function createColoringBook(workspaceId: string, userId: string, in
     generation: { outline: false, content: false, interior: false, coverConcept: false, titleSuggestions: false, metadata: false, similarity: true, validate: true },
   });
   const { row, data } = await currentMetadata(project.id);
-  if (row) await prisma.metadataDraft.update({ where: { id: row.id }, data: { data: MetadataDraft.parse({ ...data, subtitle: input.subtitle, seriesName: input.seriesName, seriesNumber: input.seriesName ? input.seriesNumber : null }) as unknown as Prisma.InputJsonValue } });
+  if (row) await prisma.metadataDraft.update({ where: { id: row.id }, data: { data: MetadataDraft.parse({ ...data, subtitle: input.subtitle, description: data.description || input.description, seriesName: input.seriesName, seriesNumber: input.seriesName ? input.seriesNumber : null }) as unknown as Prisma.InputJsonValue } });
   if (input.budgetCapUsd != null) await prisma.project.update({ where: { id: project.id }, data: { aiSpendLimitUsd: new Prisma.Decimal(input.budgetCapUsd) } });
   const book = await prisma.coloringBook.create({
     data: {

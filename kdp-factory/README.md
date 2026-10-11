@@ -2,7 +2,9 @@
 
 A web application for planning, producing, validating, and exporting **original** Amazon KDP
 products: journals, notebooks, planners, logbooks, trackers, workbooks, activity, educational,
-nonfiction, and illustrated books, in paperback, hardcover, and Kindle eBook formats.
+nonfiction, illustrated and **coloring** books, in paperback, hardcover, and Kindle eBook formats.
+It includes an **image model library** (fal.ai catalog with live pricing) and a **Coloring Book
+Studio** (plan → generate → QC → review → interior → cover → preflight → export).
 
 The core is a deterministic publishing engine. It handles print geometry, layout, embedded-font
 PDFs, cover geometry, and preflight checks. AI providers draft concepts, content, metadata, and
@@ -58,27 +60,102 @@ environment variables:
 |---|---|---|---|
 | Text | Google Gemini | `GEMINI_API_KEY` | Model configurable (default `gemini-2.5-flash`). |
 | Text | OpenAI-compatible | `OPENAI_COMPATIBLE_API_KEY`, `OPENAI_COMPATIBLE_BASE_URL` | Any `/chat/completions` endpoint. |
-| Image | fal.ai | `FAL_KEY` | Background art only; cover text stays live text. |
+| Image | fal.ai | `FAL_KEY` | Model library, cover art, coloring pages. Text on covers stays live text. |
 
-Pricing for cost estimates is configured per provider. Estimates are not invoices.
+Text-provider pricing for cost estimates is configured per provider. Estimates are not invoices.
+
+### Image model library (fal.ai) and pricing
+
+**What fal.ai officially exposes** (investigated before building; used through server-side
+calls only):
+
+| Data | Official source | Notes |
+|---|---|---|
+| Model catalog | Platform API `GET https://api.fal.ai/v1/models` (`endpoint_id` lookup ≤ 50 per call, `category`/`q`/`status` search, cursor pagination, `expand=openapi-3.0`) | Gives display name, category, status and each endpoint's **OpenAPI input/output schema**, from which capabilities are derived (sizes, aspect ratios, resolutions, negative prompt, reference images, masks, seeds…). |
+| Prices | `GET /v1/models/pricing?endpoint_id=…` (needs `Authorization: Key …`) | `unit_price`, `unit`, `currency` per endpoint. Units vary (image, megapixel, tokens, seconds…); they are normalised and **never relabelled** (per-megapixel stays per-megapixel). |
+| Actual usage/cost | `GET /v1/models/usage` (needs an **Admin**-scope key, `FAL_ADMIN_KEY`) and the `X-Fal-Billable-Units` response header | Per-request actual cost is computed only when fal reports billable units; otherwise it is shown as "not reported". |
+| Generation | Official `@fal-ai/client` SDK queue API (`submit` → status → `result`) | Request id is stored before waiting, so retries resume instead of paying again. |
+
+There is no public "sample image" field guaranteed by the API; cards show `thumbnail_url` only
+when the catalog provides it.
+
+**How it behaves**
+
+- Seed models (Nano Banana 2/Pro, FLUX.1 schnell/dev, FLUX.2 variants, Seedream 4.5, Recraft V3,
+  GPT Image 2, Ideogram V3, edit/upscale models…) start as **"Candidate — not verified"**,
+  disabled, with **no price**. A catalog sync (Image models → *Sync catalog & prices*, platform
+  admins only; also automatic every `CATALOG_REFRESH_HOURS` when `FAL_KEY` is set) verifies each
+  endpoint and stores its schema. Endpoints not found are marked *Not found* and stay disabled.
+- Prices come only from fal's pricing API or an admin-recorded price **with an https source URL**
+  (history kept). Without one the UI shows **"Price unavailable"** and generation requires an
+  explicit "I accept an unverified cost" confirmation. Token-priced models need a
+  tokens-per-image assumption before they can be estimated.
+- Every generation (single, comparison, cover art, coloring batch) shows the estimate first and
+  the server rejects requests whose confirmed amount does not cover it. Workspace (daily/monthly),
+  project, per-member and per-book budget caps are enforced before each provider call.
+- Settings are validated against the model's own schema; unsupported options are rejected, not
+  silently dropped.
+- Two **offline mock** models (`mock/line-art`, `mock/cover-art`) draw procedural shapes for $0.
+  They are labelled "Not AI" everywhere and exist so the workflow can be tested without a key.
+
+**Platform admins** are users listed in `PLATFORM_ADMIN_EMAILS` (or with `isPlatformAdmin`).
+Only they can sync the catalog, enable models, edit tags/limitations/commercial-use links and
+record prices.
+
+### Coloring Book Studio
+
+*Coloring Studio* in the sidebar. A coloring book is a normal project (category `COLORING_BOOK`),
+so the interior editor, cover designer, metadata editor, preflight and export center all apply.
+
+1. **Create**: audience preset (Toddlers → Seniors), theme preset, description, age range,
+   difficulty, illustration count, series, trim (8.5×11, 8×10, 8.5×8.5, 8.25×8.25, A4, …),
+   single-sided printing, default model and budget cap.
+2. **Art direction**: style, outline thickness, detail, complexity, subject size, white space,
+   number of subjects, background, composition, aspect, extra direction; saved as a reusable
+   style profile. Prompts are built deterministically from it (black outlines on white, no
+   shading, no text…); hand-edited prompts are never overwritten.
+3. **Plan**: concepts from the theme or typed; similar concepts are flagged.
+4. **Generate**: select pages → model → per-page and total estimate (1/4/10/50/100 table) →
+   confirm → background job. Modes: new, variation, edit (image-to-image). Finished pages are kept
+   if later ones fail; retries resume the same provider request.
+5. **Review**: original and processed image side by side, version history with restore,
+   approve/reject/favorite/duplicate/replace/re-process, bulk actions. QC per image:
+   *automated* (decode, DPI at placed size, aspect, alpha), *heuristic* (white background, color
+   pixels, gray shading, contrast, ink coverage, line weight, cropping, empty areas, perceptual-hash
+   near-duplicates) and *manual* (text/watermarks, drawing quality, originality — never
+   auto-passed). Failed checks need an override note to approve; overrides are recorded.
+   Processing (flatten, grayscale, normalise, denoise, threshold, trim, pad-to-aspect, Lanczos
+   resample to 300 DPI) writes a new asset; originals are never modified.
+6. **Interior**: built from approved pages in order, with blank reverses in single-sided mode,
+   title/copyright/"belongs to"/test pages, scale and alignment. Page count is computed by the
+   layout engine; illustrations ≠ pages.
+7. **Cover**: the project cover designer (full-wrap geometry from the real page count) with the
+   *AI art* dialog for background art.
+8. **Preflight**: automated checks, visual (heuristic) warnings, manual review items, and official
+   requirements that need verification, shown separately. It is not an approval.
+9. **Metadata**: project metadata editor + back-cover copy and a coloring-specific checklist.
+10. **Export**: interior PDF, cover PDF, editable cover SVG, proof PDF, approved page images
+    (original + print), prompt/generation log CSV, QC report (JSON + HTML), preflight report,
+    metadata and a checksummed manifest. Final PDFs remain gated by preflight and reviews.
 
 ---
 
 ## Tests
 
 ```bash
-npm run test:core        # 74 unit/integration tests: specs, margins/bleed, spine, cover geometry, layout,
+npm run test:core        # 99 unit/integration tests: specs, margins/bleed, spine, cover geometry, layout,
                          # PDF validity + determinism, font embedding, metadata, similarity, rules, EPUB/DOCX,
-                         # manifest, and all five fixture projects (generated, preflighted, PDFs verified)
-npm run test:api         # 33 API tests: auth/sessions, workspace isolation, roles, encrypted keys, uploads,
-                         # provider failure handling, job retries (inline + real BullMQ/Redis), cancellation,
-                         # quotas, editor ops/locks/concurrency, cover geometry, export gating, manifest
-                         # checksums, EPUB export, batch CSV/duplicates/pause/approval, end-to-end MVP workflow
+                         # manifest, five fixture projects, pricing/estimates, OpenAPI capability derivation,
+                         # coloring prompts, repeated concepts, coloring interior (single/double-sided)
+npm run test:api         # 55 API tests: auth/sessions, isolation, roles, encrypted keys, uploads, providers,
+                         # job retries (inline + BullMQ/Redis), quotas, editors, covers, export gating,
+                         # batch, end-to-end workflow, fal catalog/pricing sync + queue flow (simulated HTTP),
+                         # confirmation/budgets, comparisons, cover art, coloring QC/processing/full workflow
 npm run test             # both
 
 # Browser end-to-end (Playwright, Chromium). Needs Postgres + a built web app:
 npm run build -w @kdp/web
-npm run test:e2e         # starts the API with JOB_RUNNER=inline unless E2E_BASE_URL is set
+npm run test:e2e         # 2 specs (product workflow, Coloring Studio); starts the API with JOB_RUNNER=inline
 ```
 
 API tests use a separate database (`TEST_DATABASE_URL`, default
@@ -113,7 +190,12 @@ npm run fixtures         # → packages/core/fixtures-out/<fixture>/
 | `STORAGE_DRIVER` | `local` | `local` or `s3` |
 | `STORAGE_LOCAL_DIR` | `./storage` | Local storage root |
 | `S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_FORCE_PATH_STYLE` | | S3-compatible storage (AWS, MinIO, R2, …) |
-| `GEMINI_API_KEY`, `OPENAI_COMPATIBLE_API_KEY`, `OPENAI_COMPATIBLE_BASE_URL`, `FAL_KEY` | | Optional server-level provider keys |
+| `GEMINI_API_KEY`, `OPENAI_COMPATIBLE_API_KEY`, `OPENAI_COMPATIBLE_BASE_URL`, `FAL_KEY` | | Optional server-level provider keys (`FAL_KEY` also enables catalog/price sync) |
+| `FAL_ADMIN_KEY` | | Admin-scope fal key for provider-reported usage/cost (`/v1/models/usage`) |
+| `FAL_PLATFORM_API_URL` | `https://api.fal.ai/v1` | fal Platform API base |
+| `PLATFORM_ADMIN_EMAILS` | | Comma-separated emails allowed to manage the image model catalog and prices |
+| `CATALOG_REFRESH_HOURS` | `24` | Automatic catalog + price refresh interval (0 disables) |
+| `IMAGE_DOWNLOAD_MAX_MB` | `60` | Size limit for downloading generated images (https only) |
 | `PORT` | `4000` | API port |
 | `SESSION_TTL_DAYS` | `14` | Sliding session lifetime |
 | `MAX_UPLOAD_MB` | `25` | Upload size limit |

@@ -90,8 +90,8 @@ export function PriceLine({ m }: { m: ModelRow }) {
   );
 }
 
-export function EstimateView({ e, compact }: { e: CostEstimate; compact?: boolean }) {
-  const s = STATUS_LABEL[e.status];
+export function EstimateView({ e, compact, mock }: { e: CostEstimate; compact?: boolean; mock?: boolean }) {
+  const s = mock ? { label: 'Free offline mock (not AI)', tone: 'muted' as const } : STATUS_LABEL[e.status];
   return (
     <div className="grid gap-1 text-sm">
       <div className="flex flex-wrap items-center gap-2">
@@ -139,14 +139,14 @@ export function useEstimate(modelId: string | null, request: ImageRequest | null
  * Confirmation block: shows the estimate and only enables the action once the user has
  * explicitly confirmed (and, without a verified price, accepted an unverified cost).
  */
-export function ConfirmCost({ estimate, errors, onConfirm, busy, label = 'Generate' }: { estimate: CostEstimate | undefined; errors?: string[]; onConfirm: (c: { acceptedEstimateUsd: number | null; acceptUnverifiedCost: boolean }) => void; busy?: boolean; label?: string }) {
+export function ConfirmCost({ estimate, errors, onConfirm, busy, label = 'Generate', mock }: { estimate: CostEstimate | undefined; errors?: string[]; onConfirm: (c: { acceptedEstimateUsd: number | null; acceptUnverifiedCost: boolean }) => void; busy?: boolean; label?: string; mock?: boolean }) {
   const [ack, setAck] = useState(false);
   useEffect(() => setAck(false), [estimate?.total, estimate?.status]);
   if (!estimate) return <Skeleton className="h-16" />;
   const unverified = estimate.status !== 'OK';
   return (
     <div className="grid gap-3 rounded-lg border p-3">
-      <EstimateView e={estimate} />
+      <EstimateView e={estimate} mock={mock} />
       {errors && errors.length > 0 && (
         <ul className="rounded bg-destructive/10 p-2 text-xs text-destructive">{errors.map((x) => <li key={x}>{x}</li>)}</ul>
       )}
@@ -278,7 +278,7 @@ export function AiArtDialog({ projectId, onUse }: { projectId: string; onUse: (a
                 <p className="text-xs">Revising image <code>{sourceAssetId.slice(-6)}</code> (image-to-image). <button className="underline" onClick={() => setSourceAssetId(null)}>Start fresh</button></p>
               )}
               {model?.price?.isBuiltIn && <p className="text-xs text-muted-foreground">The offline mock draws procedural shapes; it is for testing the workflow, not real artwork.</p>}
-              {request ? <ConfirmCost estimate={est.data?.estimate} errors={est.data?.errors} busy={busy} onConfirm={go} /> : <p className="text-sm text-muted-foreground">Describe the artwork to see the estimate.</p>}
+              {request ? <ConfirmCost estimate={est.data?.estimate} errors={est.data?.errors} busy={busy} onConfirm={go} mock={model?.price?.isBuiltIn} /> : <p className="text-sm text-muted-foreground">Describe the artwork to see the estimate.</p>}
             </div>
             <div className="grid content-start gap-2">
               {jobId ? (

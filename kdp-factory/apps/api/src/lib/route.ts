@@ -98,3 +98,6 @@ export function defineRoute<B extends ZodTypeAny = z.ZodUndefined, Q extends Zod
 }
 
 export const IdParams = z.object({ id: z.string().min(1).max(64) });
+
+/** Query-string boolean: only "true"/"1" are true (z.coerce.boolean() would turn "false" into true). */
+export const queryBool = (def: boolean) => z.union([z.boolean(), z.enum(['true', 'false', '1', '0'])]).default(def).transform((v) => v === true || v === 'true' || v === '1');

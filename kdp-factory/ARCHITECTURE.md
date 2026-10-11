@@ -133,3 +133,40 @@ lookups and export bundles. Migrations live in `apps/api/prisma/migrations`.
    values.
 4. **AI never decides pass/fail.** All blocking checks are deterministic. Content-risk checks are
    heuristics that ask for human review.
+
+## 7. Image model library and Coloring Studio
+
+```
+packages/core/src/models      pricing.ts (units, estimates, staleness) · capabilities.ts (OpenAPI → capabilities,
+                              schema-validated inputs) · seed.ts (unverified candidates, editorial tags)
+packages/core/src/coloring    presets, StyleProfile, deterministic prompt builder, repeated concepts,
+                              QC thresholds, buildColoringDocument() → InteriorDocument
+apps/api/src/providers        fal-platform.ts (catalog / pricing / usage, server-side, retries + timeouts)
+                              fal-sdk.ts (@fal-ai/client queue: submit → wait → result, billable-units capture)
+apps/api/src/services         image-catalog.ts (seed, sync, prices with history, periodic refresh)
+                              image-generation.ts (prepare → confirm → limits → submit/resume → download → asset
+                              → usage + actual cost) · image-jobs.ts (IMAGE_GENERATE / MODEL_COMPARE)
+                              coloring.ts (books, plan, estimates, COLORING_GENERATE, versions, interior,
+                              unified preflight, export files) · coloring-image.ts (sharp QC + processing)
+```
+
+Data: `ImageModel`, `ImageModelPrice` (history; `isCurrent`), `ImageGeneration` (settings, estimate,
+request id, actual cost, assets), `ModelComparison`, `ProviderUsageReport`, `SystemState`;
+`ColoringBook` (1:1 with a `COLORING_BOOK` project), `ColoringStyleProfile`, `ColoringPage`,
+`ColoringPageVersion` (original + processed asset, QC, dHash, costs). All rows are workspace-scoped
+through their project/workspace; cascades remove them with the project.
+
+Decisions:
+
+- **No invented catalog or prices.** Seeds are candidates until fal's catalog confirms them and
+  returns a schema; prices only from fal's pricing API or an admin entry with a source URL.
+- **Confirm before paying.** Every paid path checks a user-confirmed amount ≥ the server estimate
+  (or an explicit acceptance of an unverified cost) and all budget caps before the provider call.
+- **No double charges.** Submit and wait are separate; the provider request id is persisted
+  first, so job retries resume the same request. Completed pages/items are skipped on retry.
+- **The model never decides print geometry.** Cover art size/aspect come from the verified cover
+  geometry; coloring interiors from the spec engine; text stays live.
+- **Heuristics are labelled.** QC distinguishes automated facts, heuristic signals and manual
+  checks; preflight separates unverified official requirements. Nothing claims KDP approval.
+- **A coloring book is a project.** The studio adds planning, generation and QC, then writes the
+  project's interior document, so layout, PDF, preflight, covers and exports are shared code.

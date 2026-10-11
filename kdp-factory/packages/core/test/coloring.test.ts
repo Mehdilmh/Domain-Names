@@ -38,7 +38,7 @@ describe('coloring interior', () => {
     // Illustrations start on recto pages (odd page numbers, 0-based even index).
     for (const p of imgPages) expect(layout.pages.indexOf(p) % 2).toBe(0);
     expect(layout.pageCount % 2).toBe(0);
-    expect(layout.warnings.filter((w) => w.level === "error")).toEqual([]);
+    expect(layout.warnings.filter((w) => w.level === "error" || w.code === 'UNKNOWN_TEMPLATE')).toEqual([]);
     const bytes = lineArt();
     const pdf = await renderInteriorPdf(layout, { assets: () => ({ bytes, mimeType: 'image/png' }) });
     const ins = await inspectPdf(pdf);

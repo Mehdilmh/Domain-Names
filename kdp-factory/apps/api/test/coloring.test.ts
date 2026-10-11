@@ -145,6 +145,7 @@ describe('Coloring Studio workflow', () => {
     expect(imgPages).toHaveLength(3);
     for (const p of imgPages) expect(interior.body.pages[p.index + 1].blank).toBe(true);
     expect(interior.body.trim.widthIn).toBe(8.5);
+    expect(interior.body.warnings.filter((w: { code: string; level: string }) => w.level === 'error' || w.code === 'UNKNOWN_TEMPLATE')).toEqual([]);
 
     const pf = await a.agent.post(`/api/coloring/${id}/preflight`).set(H).send({});
     expect(pf.status).toBe(200);
@@ -176,6 +177,8 @@ describe('Coloring Studio workflow', () => {
     expect(log).toContain('mock/line-art-priced');
 
     // Dashboard, duplicate, archive.
+    // Regression: the query string "false" must not be read as true.
+    expect((await a.agent.get('/api/coloring?archived=false')).body.some((r: { id: string }) => r.id === id)).toBe(true);
     const list = await a.agent.get('/api/coloring');
     const row = list.body.find((r: { id: string }) => r.id === id);
     expect(row).toMatchObject({ approved: 3, pages: 4 });

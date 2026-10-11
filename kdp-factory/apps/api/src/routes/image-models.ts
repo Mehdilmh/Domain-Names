@@ -7,7 +7,7 @@ import { prisma } from '../db';
 import { audit } from '../lib/audit';
 import { requireUser } from '../lib/auth';
 import { badRequest, forbidden, HttpError, notFound } from '../lib/errors';
-import { defineRoute, IdParams } from '../lib/route';
+import { defineRoute, IdParams, queryBool } from '../lib/route';
 import { ensureCatalog, getModel, modelDto, syncCatalog, syncProviderUsage, estimateFor } from '../services/image-catalog';
 import { checkConfirmation, NormalizedRequestSchema, prepareGeneration } from '../services/image-generation';
 import { createJob } from '../services/jobs';
@@ -39,8 +39,8 @@ const ListQuery = z.object({
   task: z.enum(IMAGE_TASKS).optional(),
   filter: z.enum(FILTERS).optional(),
   sort: z.enum(SORTS).default('recommended'),
-  includeUnavailable: z.coerce.boolean().default(false),
-  includeMock: z.coerce.boolean().default(true),
+  includeUnavailable: queryBool(false),
+  includeMock: queryBool(true),
   widthPx: z.coerce.number().int().min(64).max(16384).optional(),
   heightPx: z.coerce.number().int().min(64).max(16384).optional(),
   numImages: z.coerce.number().int().min(1).max(1000).default(1),

@@ -16,6 +16,9 @@ const TemplatesPage = lazy(() => import('./pages/templates'));
 const UsagePage = lazy(() => import('./pages/usage'));
 const SettingsPage = lazy(() => import('./pages/settings'));
 const ModelsPage = lazy(() => import('./pages/models'));
+const ColoringList = lazy(() => import('./pages/coloring-list'));
+const ColoringNew = lazy(() => import('./pages/coloring-new'));
+const ColoringBookPage = lazy(() => import('./pages/coloring-book'));
 
 const Spinner = () => (
   <div className="flex h-64 items-center justify-center text-muted-foreground" role="status">
@@ -56,6 +59,9 @@ export function App() {
             <Route path="templates" element={<TemplatesPage />} />
             <Route path="usage" element={<UsagePage />} />
             <Route path="models" element={<ModelsPage />} />
+            <Route path="coloring" element={<ColoringList />} />
+            <Route path="coloring/new" element={<ColoringNew />} />
+            <Route path="coloring/:id" element={<ColoringBookPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="*" element={<p className="text-muted-foreground">Page not found.</p>} />
           </Route>

@@ -107,6 +107,11 @@ describe('image model catalog', () => {
     expect(mock.description + mock.knownLimitations).toMatch(/not ai/i);
   });
 
+  it('boolean query flags parse "false" as false', async () => {
+    const r = await admin.agent.get('/api/image-models?includeMock=false&includeUnavailable=false');
+    expect(r.body.models.some((m: { provider: string }) => m.provider === 'mock')).toBe(false);
+  });
+
   it('only platform admins can sync or price the catalog', async () => {
     const other = await signUp('Workspace Owner');
     expect((await other.agent.post('/api/admin/image-models/sync').set(H).send({})).status).toBe(403);
