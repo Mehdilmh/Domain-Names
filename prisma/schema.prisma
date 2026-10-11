@@ -1,4 +1,4 @@
-// DomainPulse — Prisma schema
+// KDP Product Factory — Prisma schema
 generator client {
   provider = "prisma-client-js"
 }

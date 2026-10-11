@@ -1,4 +1,4 @@
-# DomainPulse
+# KDP Product Factory
 
 **AI-powered domain valuation SaaS.** Enter a domain (or bulk-upload a CSV) and get an
 estimated Buy-It-Now price range, a confidence score, an estimated time-to-sell, comparable
@@ -29,10 +29,10 @@ enabled outside production) and you'll get 25 free credits.
 Accounts whose email is in `ADMIN_EMAILS` are auto-promoted to the **admin** role and have
 **unlimited credits** — appraisals, bulk jobs, and API calls are never charged.
 
-- The seed creates a ready-to-use admin: **`admin@domainpulse.test`**. Sign in at `/login` with
+- The seed creates a ready-to-use admin: **`admin@kdp-product-factory.test`**. Sign in at `/login` with
   that email (dev sign-in) to get an unlimited account immediately.
 - To make your own account admin, add your email:
-  `ADMIN_EMAILS="admin@domainpulse.test,you@example.com"` in `.env`, then sign in with it (works
+  `ADMIN_EMAILS="admin@kdp-product-factory.test,you@example.com"` in `.env`, then sign in with it (works
   with Google/email providers too — promotion happens on sign-in). Existing accounts are promoted
   automatically the next time they sign in.
 

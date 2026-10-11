@@ -4,7 +4,7 @@ import { llmProvider } from "@/lib/providers/anthropic";
 import { APPRAISAL_CACHE_DAYS } from "@/config/app";
 import type { Comp, DomainFeatures, Prediction, TrademarkResult } from "./types";
 
-const SYSTEM_PROMPT = `You are a domain valuation analyst for a tool called DomainPulse.
+const SYSTEM_PROMPT = `You are a domain valuation analyst for a tool called KDP Product Factory.
 Given extracted features, a price estimate, and comparable sales, write ONE concise
 paragraph (3-5 sentences) of plain-English reasoning explaining the valuation.
 Reference concrete drivers (length, TLD, keyword demand, comparables). Be measured and

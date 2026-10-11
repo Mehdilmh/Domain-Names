@@ -1,10 +1,10 @@
 /**
- * DomainPulse — central product configuration.
+ * KDP Product Factory — central product configuration.
  *
  * Rename the entire product by changing APP_NAME. It flows through the UI,
  * metadata, emails, and OpenAPI docs.
  */
-export const APP_NAME = "DomainPulse";
+export const APP_NAME = "KDP Product Factory";
 export const APP_TAGLINE = "AI-powered domain valuation";
 export const APP_DESCRIPTION =
   "Estimate any domain's Buy-It-Now price range, confidence, and time-to-sell — backed by transparent comparable sales.";
@@ -88,7 +88,7 @@ export const RENEWAL_ALERT_DAYS = 30;
  * the "admin" role on sign-in and has UNLIMITED credits (spends are never
  * charged). Configure via the ADMIN_EMAILS env var (comma-separated).
  */
-export const ADMIN_EMAILS = (process.env.ADMIN_EMAILS ?? "admin@domainpulse.test")
+export const ADMIN_EMAILS = (process.env.ADMIN_EMAILS ?? "admin@kdp-product-factory.test")
   .split(",")
   .map((e) => e.trim().toLowerCase())
   .filter(Boolean);

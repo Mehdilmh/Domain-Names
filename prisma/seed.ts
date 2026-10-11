@@ -89,7 +89,7 @@ function makeSld(): string {
 }
 
 async function main() {
-  console.log("🌱 Seeding DomainPulse sales data…");
+  console.log("🌱 Seeding KDP Product Factory sales data…");
   await prisma.sale.deleteMany();
 
   const TARGET = 3000;

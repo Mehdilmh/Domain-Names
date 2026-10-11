@@ -12,7 +12,7 @@ export interface EmailMessage {
 }
 
 export async function sendEmail(msg: EmailMessage): Promise<void> {
-  const from = process.env.EMAIL_FROM ?? "DomainPulse <no-reply@domainpulse.test>";
+  const from = process.env.EMAIL_FROM ?? "KDP Product Factory <no-reply@kdp-product-factory.test>";
 
   if (!process.env.EMAIL_SERVER) {
     console.log("📧 [email:console]", { to: msg.to, subject: msg.subject });

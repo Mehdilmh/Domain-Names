@@ -10,7 +10,7 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // DomainPulse design system — emerald/amber, dark-first. NOT blue/indigo.
+        // KDP Product Factory design system — emerald/amber, dark-first. NOT blue/indigo.
         background: "#0B0F0E",
         surface: "#131A18",
         border: "#1F2C28",
