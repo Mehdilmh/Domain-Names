@@ -1,4 +1,4 @@
-import { defaultSpecSource, InteriorDocument, MetadataDraft, type InteriorDocumentInput, type PageInstanceInput } from '@kdp/core';
+import { buildColoringDocument, ColoringInteriorSettings, defaultSpecSource, InteriorDocument, MetadataDraft, type InteriorDocumentInput, type PageInstanceInput } from '@kdp/core';
 import type { Prisma, Project, ProjectStatus } from '@prisma/client';
 import type { z } from 'zod';
 import { prisma } from '../db';
@@ -52,6 +52,9 @@ export function starterDocument(contentType: z.infer<typeof ContentType>, title:
       return { settings, frontMatter: [...front, p('howto', 'how-to-use')], body: { kind: 'pages', pages: Array.from({ length: n - 1 }, (_, i) => p(`p${i + 1}`, i % 4 === 3 ? 'equipment-inspection' : 'work-order-log')) } };
     case 'WORKBOOK':
       return { settings, frontMatter: [...front, p('howto', 'how-to-use'), p('toc', 'toc')], body: { kind: 'pages', pages: Array.from({ length: n - 2 }, (_, i) => p(`p${i + 1}`, i % 6 === 0 ? 'chapter-page' : 'workbook-exercise', i % 6 === 0 ? { chapterLabel: `Part ${i / 6 + 1}`, chapterTitle: `Part ${i / 6 + 1}` } : {})) } };
+    case 'COLORING':
+      // Body is built from approved coloring pages in the Coloring Studio.
+      return buildColoringDocument([], ColoringInteriorSettings.parse({}), { title, author });
     case 'ILLUSTRATED':
       return { settings, frontMatter: front, body: { kind: 'pages', pages: Array.from({ length: n }, (_, i) => ({ id: `p${i + 1}`, templateId: null, elements: [{ id: 'text', type: 'text', text: '', style: { align: 'center', sizePt: 18 } }] })) } };
     case 'LONG_FORM':

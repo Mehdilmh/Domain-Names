@@ -15,6 +15,7 @@ import { authRouter } from './routes/auth';
 import { batchRouter } from './routes/batches';
 import { coverRouter } from './routes/covers';
 import { exportRouter } from './routes/exports';
+import { coloringRouter } from './routes/coloring';
 import { imageModelRouter } from './routes/image-models';
 import { interiorRouter } from './routes/interior';
 import { jobRouter } from './routes/jobs';
@@ -67,7 +68,7 @@ export function createApp() {
   app.get('/api/openapi.json', (_req, res) => res.json(openapi()));
   app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(undefined, { swaggerOptions: { url: '/api/openapi.json' } }));
 
-  for (const r of [authRouter, workspaceRouter, projectRouter, interiorRouter, coverRouter, metadataRouter, validationRouter, exportRouter, jobRouter, batchRouter, assetRouter, settingsRouter, imageModelRouter]) app.use('/api', r);
+  for (const r of [authRouter, workspaceRouter, projectRouter, interiorRouter, coverRouter, metadataRouter, validationRouter, exportRouter, jobRouter, batchRouter, assetRouter, settingsRouter, imageModelRouter, coloringRouter]) app.use('/api', r);
 
   app.use('/api', (_req, _res, next) => next(new HttpError(404, 'NOT_FOUND', 'Unknown API route')));
   app.use(errorHandler);

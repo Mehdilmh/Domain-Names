@@ -20,6 +20,7 @@ import { prisma } from '../db';
 import { conflict } from '../lib/errors';
 import { getStorage } from '../lib/storage';
 import { buildAndValidate, currentMetadata, pendingReviewIds } from './build';
+import { coloringExportFiles } from './coloring';
 import { loadDocument } from './interior';
 import { snapshotProject } from './versions';
 
@@ -38,6 +39,9 @@ export const EXPORT_KINDS = [
   'METADATA_CSV',
   'METADATA_JSON',
   'KEYWORDS_CSV',
+  'COLORING_PAGES_ZIP',
+  'COLORING_PROMPT_LOG',
+  'COLORING_QC_REPORT',
 ] as const;
 export const ExportKind = z.enum(EXPORT_KINDS);
 export type ExportKind = z.infer<typeof ExportKind>;
@@ -76,6 +80,7 @@ export async function createExport(project: Project, kinds: ExportKind[], log: (
   const files: { name: string; kind: string; type: string; data: Uint8Array | string }[] = [];
   const add = (name: string, kind: string, type: string, data: Uint8Array | string) => files.push({ name, kind, type, data });
 
+  let coloring: Awaited<ReturnType<typeof coloringExportFiles>> | undefined;
   for (const k of kinds) {
     log(`Exporting ${k}…`);
     switch (k) {
@@ -138,6 +143,19 @@ export async function createExport(project: Project, kinds: ExportKind[], log: (
       case 'KEYWORDS_CSV':
         add(`${base}-keyword-research.csv`, k, 'text/csv', keywordEvidenceCsv(md));
         break;
+      case 'COLORING_PAGES_ZIP':
+      case 'COLORING_PROMPT_LOG':
+      case 'COLORING_QC_REPORT': {
+        coloring ??= await coloringExportFiles(project.id);
+        if (!coloring) throw conflict('Coloring exports apply to Coloring Studio projects.');
+        if (k === 'COLORING_PAGES_ZIP') add(`${base}-coloring-pages.zip`, k, 'application/zip', coloring.pagesZip);
+        if (k === 'COLORING_PROMPT_LOG') add(`${base}-prompt-log.csv`, k, 'text/csv', coloring.promptLog);
+        if (k === 'COLORING_QC_REPORT') {
+          add(`${base}-coloring-qc.json`, k, 'application/json', coloring.qcJson);
+          add(`${base}-coloring-qc.html`, k, 'text/html', coloring.qcHtml);
+        }
+        break;
+      }
     }
   }
 

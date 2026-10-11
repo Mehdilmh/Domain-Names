@@ -15,3 +15,4 @@ export type { CheckResult, CheckStatus, PreflightReport, Severity, ContentClass 
 export * from './models/pricing';
 export { EDITORIAL_TAGS, type EditorialTag } from './models/seed';
 export type { ModelCapabilities, ImageTask, SizeOption } from './models/capabilities';
+export * from './coloring';

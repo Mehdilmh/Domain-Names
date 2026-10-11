@@ -13,10 +13,11 @@ export const PRODUCT_CATEGORIES = [
   'EDUCATIONAL',
   'NONFICTION',
   'ILLUSTRATED',
+  'COLORING_BOOK',
 ] as const;
 export const ProductCategory = z.enum(PRODUCT_CATEGORIES);
 
-export const CONTENT_TYPES = ['BLANK', 'LINED', 'DOT_GRID', 'STRUCTURED_FORMS', 'PLANNER', 'LOGBOOK', 'WORKBOOK', 'LONG_FORM', 'ILLUSTRATED'] as const;
+export const CONTENT_TYPES = ['BLANK', 'LINED', 'DOT_GRID', 'STRUCTURED_FORMS', 'PLANNER', 'LOGBOOK', 'WORKBOOK', 'LONG_FORM', 'ILLUSTRATED', 'COLORING'] as const;
 export const ContentType = z.enum(CONTENT_TYPES);
 
 /** Default content class per category; users can override with justification. */
@@ -32,6 +33,8 @@ export const DEFAULT_CONTENT_CLASS: Record<z.infer<typeof ProductCategory>, 'LOW
   EDUCATIONAL: 'FULL',
   NONFICTION: 'FULL',
   ILLUSTRATED: 'MEDIUM',
+  // Original illustrations (not a blank/low-content template).
+  COLORING_BOOK: 'MEDIUM',
 };
 
 export const GenerationSettings = z.object({

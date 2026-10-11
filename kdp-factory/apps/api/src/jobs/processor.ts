@@ -6,13 +6,14 @@ import { withTimeout } from '../providers/retry';
 import { ProviderError } from '../providers/types';
 import { runBatchItem } from '../services/batch';
 import { runImageJob } from '../services/image-jobs';
+import { runColoringJob } from '../services/coloring';
 import { buildAndValidate } from '../services/build';
 import { createExport, ExportKind } from '../services/exports';
 import { stageContent, stageCover, stageInterior, stageMetadata, stageResearch, type GenCtx } from '../services/generation';
 import { advanceStatus } from '../services/projects';
 import { GenerationSettings } from '../services/schemas';
 
-export const JOB_TYPES = ['GENERATE', 'VALIDATE', 'EXPORT', 'BATCH_ITEM', 'IMAGE_GENERATE', 'MODEL_COMPARE'] as const;
+export const JOB_TYPES = ['GENERATE', 'VALIDATE', 'EXPORT', 'BATCH_ITEM', 'IMAGE_GENERATE', 'MODEL_COMPARE', 'COLORING_GENERATE'] as const;
 export const JobType = z.enum(JOB_TYPES);
 
 export class CancelledError extends Error {}
@@ -121,6 +122,11 @@ export async function processJob(jobId: string): Promise<void> {
       case 'MODEL_COMPARE':
         await save({ stage: 'images' });
         await runImageJob(job, () => isCancelled(jobId), (m) => void appendLog(jobId, m), ctrl.signal);
+        if (await isCancelled(jobId)) throw new CancelledError('Cancelled by user');
+        break;
+      case 'COLORING_GENERATE':
+        await save({ stage: 'coloring-pages' });
+        await runColoringJob(job, () => isCancelled(jobId), (m) => void appendLog(jobId, m), ctrl.signal);
         if (await isCancelled(jobId)) throw new CancelledError('Cancelled by user');
         break;
       case 'BATCH_ITEM':

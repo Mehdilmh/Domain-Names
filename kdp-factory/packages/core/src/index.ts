@@ -22,3 +22,4 @@ export * from './fixtures';
 export * from './models/pricing';
 export * from './models/capabilities';
 export * from './models/seed';
+export * from './coloring';

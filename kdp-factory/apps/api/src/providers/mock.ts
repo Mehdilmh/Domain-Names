@@ -141,7 +141,7 @@ export class MockImageProvider implements ImageProvider {
  * pipeline (QC, processing, interior) can be exercised end to end without API keys.
  */
 export async function mockImage(endpointId: string, seed: string, w: number, h: number): Promise<Uint8Array> {
-  if (endpointId === 'mock/line-art') {
+  if (endpointId.startsWith('mock/line-art')) {
     const stroke = Math.max(3, Math.round(Math.min(w, h) / 160));
     const shapes = Array.from({ length: 6 }, (_, i) => {
       const x = 0.15 + ((fnv1a(seed + 'x' + i) % 1000) / 1000) * 0.7;

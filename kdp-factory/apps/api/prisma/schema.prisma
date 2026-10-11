@@ -108,6 +108,8 @@ model Workspace {
   preferredImageModelId String?
   imageGenerations    ImageGeneration[]
   comparisons         ModelComparison[]
+  coloringBooks       ColoringBook[]
+  coloringStyles      ColoringStyleProfile[]
   memberships         Membership[]
   projects            Project[]
   templates           PageTemplate[]
@@ -168,6 +170,7 @@ model Project {
   versions              ProjectVersion[]
   assets                Asset[]
   batchItem             BatchItem?
+  coloringBook          ColoringBook?
 
   @@index([workspaceId, status])
   @@index([workspaceId, updatedAt])
@@ -663,4 +666,107 @@ model SystemState {
   key       String   @id
   value     Json
   updatedAt DateTime @updatedAt
+}
+
+/// Coloring Book Studio: one per COLORING_BOOK project (the project holds format, interior,
+/// covers, metadata and exports; this holds the studio's plan, style and pages).
+model ColoringBook {
+  id                 String         @id @default(cuid())
+  workspaceId        String
+  projectId          String         @unique
+  audience           String
+  theme              String         @default("")
+  description        String         @default("")
+  ageRange           String         @default("")
+  difficulty         String         @default("EASY")
+  illustrationTarget Int
+  seriesName         String         @default("")
+  seriesNumber       Int?
+  styleProfile       Json
+  styleProfileId     String?
+  modelId            String?
+  interiorSettings   Json
+  qcThresholds       Json
+  budgetCapUsd       Decimal?       @db.Decimal(10, 4)
+  metadataExtras     Json           @default("{}")
+  /// SETUP | PLANNING | GENERATING | REVIEW | INTERIOR | COVER | PREFLIGHT | READY | EXPORTED
+  stage              String         @default("SETUP")
+  createdById        String?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+  workspace          Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project            Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  pages              ColoringPage[]
+
+  @@index([workspaceId, updatedAt])
+  @@index([workspaceId, stage])
+}
+
+/// Reusable art-direction profile (workspace scoped).
+model ColoringStyleProfile {
+  id          String    @id @default(cuid())
+  workspaceId String
+  name        String
+  profile     Json
+  createdById String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, name])
+}
+
+model ColoringPage {
+  id                String                @id @default(cuid())
+  bookId            String
+  position          Int
+  concept           String
+  prompt            String
+  negativePrompt    String                @default("")
+  promptVersion     String                @default("")
+  promptEdited      Boolean               @default(false)
+  modelId           String?
+  params            Json                  @default("{}")
+  referenceAssetIds String[]
+  /// PLANNED | QUEUED | GENERATING | NEEDS_REVIEW | APPROVED | REJECTED | FAILED
+  status            String                @default("PLANNED")
+  favorite          Boolean               @default(false)
+  currentVersionId  String?
+  notes             String                @default("")
+  qcOverride        Json?
+  error             String?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  book              ColoringBook          @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  versions          ColoringPageVersion[]
+
+  @@index([bookId, position])
+  @@index([bookId, status])
+}
+
+/// Every generated/uploaded image is a version; originals are never overwritten.
+model ColoringPageVersion {
+  id               String       @id @default(cuid())
+  pageId           String
+  version          Int
+  /// AI | UPLOAD | MOCK
+  source           String
+  generationId     String?
+  prompt           String       @default("")
+  negativePrompt   String       @default("")
+  modelId          String?
+  params           Json         @default("{}")
+  originalAssetId  String
+  processedAssetId String?
+  processing       Json?
+  qc               Json?
+  dhash            String?
+  estimatedCostUsd Decimal?     @db.Decimal(12, 6)
+  actualCostUsd    Decimal?     @db.Decimal(12, 6)
+  createdById      String?
+  createdAt        DateTime     @default(now())
+  page             ColoringPage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@unique([pageId, version])
+  @@index([generationId])
 }
